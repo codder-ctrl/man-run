@@ -1,6 +1,6 @@
 {
   "name": "man-run",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Fun Run tarzı, tarayıcıda oynanan hayvanlı koşu yarışı (build adımı yok).",

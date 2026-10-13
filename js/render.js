@@ -313,7 +313,7 @@ export function createRenderer(canvas) {
       ctx.restore();
     }
     // Name tag.
-    const label = isPlayer ? 'SEN' : a.name;
+    const label = isPlayer ? 'SEN' : r.name || a.name;
     const ly = r.y - 84 - (r.tagLift || 0);
     ctx.font = `${isPlayer ? 14 : 12}px "Lilita One", sans-serif`;
     ctx.textAlign = 'center';

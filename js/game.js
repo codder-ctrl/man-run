@@ -1,5 +1,13 @@
 // Race rules: runners, items, hazards, places. No drawing; events go to the renderer and sound
 // through race.events (drained by main.js every frame).
+//
+// Roles (race.role):
+//   'solo'  — everything runs here (one player + bots).
+//   'host'  — everything runs here; friends' runners are 'remote': their movement comes from their
+//             phones (net reports), but items, hits, boxes, places and the finish are decided here.
+//   'guest' — only this phone's own runner moves here (so jumping never lags); everything else
+//             (other runners, bots, saws, boxes, places) is copied from the host's snapshots.
+// Runner control (r.ctrl): 'local' (this phone's input), 'bot', 'remote'.
 
 import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, ANIMALS, BOT_SKILL } from './config.js';
 import { buildTrack, respawnAt, rng } from './track.js';
@@ -8,45 +16,66 @@ import { createBot } from './ai.js';
 
 export const COUNTDOWN = 3;
 
-function makeRunner(id, animal, isBot, lane) {
+function makeRunner(id, animal, ctrl, name) {
   return {
-    id, animal, isBot,
-    x: 150 - lane * 34, y: 0, vx: 0, vy: 0, w: PHYS.w, h: PHYS.h,
+    id, animal, ctrl, name: name || null,
+    isBot: ctrl === 'bot',
+    x: 150 - id * 34, y: 0, vx: 0, vy: 0, w: PHYS.w, h: PHYS.h,
     grounded: true, coyote: 0, jumpBuf: 0, cut: true, hold: false,
     stun: 0, stunKind: null, shield: 0, boost: 0, pad: 0, invuln: 0,
-    item: null, rolling: 0, dead: 0, finished: false, finishTime: 0, place: lane + 1,
-    inMud: false, lastJump: -1, airTime: 0, lane,
+    item: null, rolling: 0, dead: 0, deathX: 0, finished: false, finishTime: 0, place: id + 1,
+    inMud: false, airTime: 0, runPhase: 0, slope: 0,
     bot: null,
   };
 }
 
-// opts: { seed, playerAnimal, length, theme }
+// opts: { seed, theme, length, playerAnimal, allBots, autoPlayer } for solo races, or
+//       { seed, theme, role: 'host'|'guest', roster: [{ animal, name, ctrl }], me } for online ones.
 export function createRace(opts = {}) {
   const seed = opts.seed ?? (Math.random() * 1e9) >>> 0;
-  const T = buildTrack(seed, { length: opts.length ?? 15000, theme: opts.theme || 'forest' });
+  const theme = opts.theme || 'forest';
+  const T = buildTrack(seed, { length: opts.length ?? 15000, theme });
   const R = rng(seed ^ 0x9e3779b9);
-  const playerAnimal = opts.playerAnimal || 'fox';
-  const others = ANIMALS.filter((a) => a.id !== playerAnimal).map((a) => a.id);
-  for (let i = others.length - 1; i > 0; i--) {
-    const j = Math.floor(R() * (i + 1));
-    [others[i], others[j]] = [others[j], others[i]];
+  let roster = opts.roster;
+  if (!roster) {
+    const playerAnimal = opts.playerAnimal || 'fox';
+    const others = ANIMALS.filter((a) => a.id !== playerAnimal).map((a) => a.id);
+    for (let i = others.length - 1; i > 0; i--) {
+      const j = Math.floor(R() * (i + 1));
+      [others[i], others[j]] = [others[j], others[i]];
+    }
+    roster = [{ animal: playerAnimal, ctrl: opts.allBots || opts.autoPlayer ? 'bot' : 'local' }];
+    for (let i = 1; i < 4; i++) roster.push({ animal: others[i - 1], ctrl: 'bot' });
   }
-  const runners = [makeRunner(0, playerAnimal, !!(opts.allBots || opts.autoPlayer), 0)];
-  for (let i = 1; i < 4; i++) runners.push(makeRunner(i, others[i - 1], true, i));
-  runners.forEach((r) => { if (r.isBot) r.bot = createBot(r, BOT_SKILL[(r.id + 2) % 3], R); });
+  const role = opts.role || 'solo';
+  const runners = roster.map((p, i) => makeRunner(i, p.animal, role === 'guest' && i !== opts.me ? 'remote' : p.ctrl, p.name));
   const race = {
-    T, seed, R, runners, player: runners[0],
+    T, seed, R, runners, role, theme,
+    player: runners[opts.me ?? 0],
     time: -COUNTDOWN, // negative during the countdown
     phase: 'countdown', // countdown → race → done
     saws: [], traps: [], anvils: [],
     events: [],
+    outbox: [], // guest → host messages (item use)
     order: runners.slice(),
     finishedCount: 0,
     doneTimer: 0,
     allBots: !!opts.allBots,
+    nextId: 1,
   };
+  race.humans = runners.filter((r) => r.ctrl !== 'bot');
+  runners.forEach((r) => { if (r.ctrl === 'bot') r.bot = createBot(r, BOT_SKILL[(r.id + 2) % 3], R); });
   race.useItem = (r) => useItem(race, r);
   return race;
+}
+
+// A friend left: their runner keeps going as a bot (host only).
+export function makeBot(race, r) {
+  r.ctrl = 'bot';
+  r.isBot = true;
+  r.bot = createBot(r, BOT_SKILL[1], race.R);
+  r.net = null;
+  race.humans = race.runners.filter((o) => o.ctrl !== 'bot');
 }
 
 const emit = (race, type, data = {}) => race.events.push({ type, ...data });
@@ -57,15 +86,12 @@ function topSpeed(race, r) {
   let s = PHYS.run;
   if (r.boost > 0 || r.pad > 0) s = PHYS.boost;
   else if (r.inMud) s = PHYS.mud;
-  if (r.isBot && r.bot) s *= r.bot.speedMul;
+  if (r.bot) s *= r.bot.speedMul;
   return s;
 }
 
-// Hits a runner with an attack; shields block. Returns true if it landed.
-export function hit(race, r, kind, from) {
-  if (r.dead > 0 || r.finished) return false;
-  if (r.shield > 0) { emit(race, 'blocked', { id: r.id, kind }); return false; }
-  if (kind === 'spikes' && r.invuln > 0) return false;
+// What a hit does to a runner's body (also used by a guest when the host says it was hit).
+export function applyHit(r, kind) {
   r.stun = Math.max(r.stun, STUN[kind]);
   r.stunKind = kind;
   r.boost = 0;
@@ -73,7 +99,15 @@ export function hit(race, r, kind, from) {
   if (kind === 'spikes') { r.vy = -520; r.vx = -140; r.grounded = false; r.invuln = 1.4; }
   else if (kind === 'saw' || kind === 'anvil') { r.vx = 0; if (r.grounded) r.vy = -260; r.grounded = false; }
   else r.vx *= 0.2;
-  emit(race, 'hit', { id: r.id, kind, from: from?.id });
+}
+
+// Hits a runner with an attack; shields block. Returns true if it landed.
+export function hit(race, r, kind, from, extra = {}) {
+  if (r.dead > 0 || r.finished) return false;
+  if (r.shield > 0) { emit(race, 'blocked', { id: r.id, kind }); return false; }
+  if (kind === 'spikes' && r.invuln > 0) return false;
+  applyHit(r, kind);
+  emit(race, 'hit', { id: r.id, kind, from: from?.id, ...extra });
   return true;
 }
 
@@ -91,6 +125,13 @@ function rollItem(race, r) {
 
 export function useItem(race, r) {
   if (!r.item || r.rolling > 0 || r.dead > 0 || race.phase !== 'race') return false;
+  if (race.role === 'guest') {
+    // The host decides what the item does; it answers through its snapshots and events.
+    race.outbox.push({ t: 'use' });
+    r.item = null;
+    r.usedAt = race.time;
+    return true;
+  }
   const item = r.item;
   r.item = null;
   emit(race, 'use', { id: r.id, item });
@@ -100,29 +141,62 @@ export function useItem(race, r) {
     for (const o of race.runners) if (o !== r) hit(race, o, 'lightning', r);
     emit(race, 'lightning', { id: r.id });
   } else if (item === 'saw') {
-    race.saws.push({ x: r.x + 26, y: r.y - 2, vx: SAW_SPEED + Math.max(0, r.vx), speed: SAW_SPEED + Math.max(0, r.vx), vy: 0, w: 22, h: 22, grounded: r.grounded, owner: r.id, life: SAW_LIFE, spin: 0 });
+    race.saws.push({ id: race.nextId++, x: r.x + 26, y: r.y - 2, vx: SAW_SPEED + Math.max(0, r.vx), speed: SAW_SPEED + Math.max(0, r.vx), vy: 0, w: 22, h: 22, grounded: r.grounded, owner: r.id, life: SAW_LIFE, spin: 0 });
   } else if (item === 'trap') {
-    race.traps.push({ x: r.x - 30, y: r.y, vy: 0, w: 30, h: 10, grounded: false, owner: r.id, armed: 0.4, snap: 0, victim: -1 });
+    race.traps.push({ id: race.nextId++, x: r.x - 30, y: r.y, vy: 0, w: 30, h: 10, grounded: false, owner: r.id, armed: 0.4, snap: 0, victim: -1 });
   } else if (item === 'anvil') {
     const leader = race.order.find((o) => o !== r && !o.finished && o.dead <= 0);
     if (leader) {
-      race.anvils.push({ target: leader.id, owner: r.id, t: 0, warn: 0.75, fall: 0.32, x: leader.x, y: leader.y });
+      race.anvils.push({ id: race.nextId++, target: leader.id, owner: r.id, t: 0, warn: 0.75, fall: 0.32, x: leader.x, y: leader.y });
       emit(race, 'anvilWarn', { id: leader.id });
     }
   }
   return true;
 }
 
-function updateRunner(race, r, dt, input) {
-  const T = race.T;
+function tickTimers(race, r, dt) {
   r.invuln = Math.max(0, r.invuln - dt);
   r.shield = Math.max(0, r.shield - dt);
   r.boost = Math.max(0, r.boost - dt);
   r.pad = Math.max(0, r.pad - dt);
   if (r.rolling > 0) {
     r.rolling -= dt;
-    if (r.rolling <= 0) { r.rolling = 0; emit(race, 'itemReady', { id: r.id, item: r.item }); }
+    if (r.rolling <= 0) { r.rolling = 0; if (race.role !== 'guest') emit(race, 'itemReady', { id: r.id, item: r.item }); }
   }
+  const wasStunned = r.stun > 0;
+  r.stun = Math.max(0, r.stun - dt);
+  if (wasStunned && r.stun === 0) r.stunKind = null;
+}
+
+function pickupBoxes(race, r) {
+  for (const b of race.T.boxes) {
+    if (b.t > 0 || Math.abs(b.x - r.x) > 30) continue;
+    if (r.y - r.h < b.y + 15 && r.y > b.y - 15) {
+      b.t = BOX_RESPAWN;
+      emit(race, 'box', { id: r.id, x: b.x, y: b.y });
+      if (!r.item) {
+        r.item = rollItem(race, r);
+        r.rolling = r.ctrl === 'bot' ? 0.01 : 0.9;
+        if (r.bot) r.bot.gotItem();
+      }
+    }
+  }
+}
+
+function checkFinish(race, r) {
+  if (!r.finished && r.x >= race.T.finishX && race.phase === 'race') {
+    r.finished = true;
+    r.finishTime = race.time;
+    race.finishedCount++;
+    r.place = race.finishedCount;
+    emit(race, 'finish', { id: r.id, place: r.place, time: r.finishTime });
+  }
+}
+
+// A runner whose body moves on this phone (the player or a bot).
+function updateRunner(race, r, dt, input) {
+  const T = race.T;
+  tickTimers(race, r, dt);
 
   if (r.dead > 0) {
     r.dead -= dt;
@@ -136,9 +210,6 @@ function updateRunner(race, r, dt, input) {
     return;
   }
 
-  const wasStunned = r.stun > 0;
-  r.stun = Math.max(0, r.stun - dt);
-  if (wasStunned && r.stun === 0) r.stunKind = null;
   r.canJump = r.stun <= 0 && race.phase === 'race';
   const wasGrounded = r.grounded;
   const res = stepRunner(r, dt, T, r.canJump ? input : { jump: false, hold: false }, topSpeed(race, r));
@@ -155,20 +226,7 @@ function updateRunner(race, r, dt, input) {
     r.pad = PAD_TIME;
   }
   if (r.shield <= 0 && onSpikes(r, T)) hit(race, r, 'spikes');
-
-  // "?" boxes.
-  for (const b of T.boxes) {
-    if (b.t > 0 || Math.abs(b.x - r.x) > 30) continue;
-    if (r.y - r.h < b.y + 15 && r.y > b.y - 15) {
-      b.t = BOX_RESPAWN;
-      emit(race, 'box', { id: r.id, x: b.x, y: b.y });
-      if (!r.item) {
-        r.item = rollItem(race, r);
-        r.rolling = r.isBot ? 0.01 : 0.9;
-        if (r.bot) r.bot.gotItem();
-      }
-    }
-  }
+  if (race.role !== 'guest') pickupBoxes(race, r);
 
   if (r.y > T.lowest + PHYS.killY * 0.6) {
     r.dead = PHYS.respawnDelay;
@@ -177,14 +235,34 @@ function updateRunner(race, r, dt, input) {
     r.shield = 0;
     emit(race, 'fall', { id: r.id });
   }
+  if (race.role !== 'guest') checkFinish(race, r);
+}
 
-  if (!r.finished && r.x >= T.finishX && race.phase === 'race') {
-    r.finished = true;
-    r.finishTime = race.time;
-    race.finishedCount++;
-    r.place = race.finishedCount;
-    emit(race, 'finish', { id: r.id, place: r.place });
+// A runner moved by another phone. On the host the latest report is extrapolated a little and the
+// host still handles its boxes and finish; on a guest the net code interpolates it from snapshots.
+function updateRemote(race, r, dt) {
+  tickTimers(race, r, dt);
+  if (race.role === 'host') {
+    const n = r.net;
+    if (n) {
+      const age = Math.max(0, Math.min(0.12, race.time - n.at));
+      r.x = n.x + (n.dead > 0 ? 0 : n.vx * age);
+      r.y = n.y + (n.grounded || n.dead > 0 ? 0 : n.vy * age);
+      r.vx = n.vx; r.vy = n.vy; r.grounded = n.grounded; r.dead = n.dead; r.deathX = n.deathX;
+      r.runPhase = n.runPhase; r.slope = n.slope; r.inMud = n.inMud;
+    }
+    if (r.dead <= 0) pickupBoxes(race, r);
+    checkFinish(race, r);
   }
+  // Infer jump/land/fall/respawn effects from state changes.
+  const st = r.dead > 0 ? 'dead' : r.grounded ? 'ground' : 'air';
+  if (r.lastSt && st !== r.lastSt) {
+    if (st === 'air' && r.lastSt === 'ground' && r.vy < -200) emit(race, 'jump', { id: r.id, remote: true });
+    if (st === 'ground' && r.lastSt === 'air') emit(race, 'land', { id: r.id, remote: true });
+    if (st === 'dead') emit(race, 'fall', { id: r.id, remote: true });
+    if (r.lastSt === 'dead') emit(race, 'respawn', { id: r.id, remote: true });
+  }
+  r.lastSt = st;
 }
 
 function updateSaws(race, dt) {
@@ -195,7 +273,7 @@ function updateSaws(race, dt) {
     s.vy = Math.min(PHYS.maxFall, s.vy + PHYS.gravity * dt);
     const res = moveBody(s, dt, T, 14);
     if (res.blocked) {
-      // Hops over walls and steps (gives up after a few).
+      // Hops over walls and steps (gives up after a while).
       s.vx = s.speed;
       if (s.grounded) s.vy = -680;
       s.hops = (s.hops || 0) + 1;
@@ -231,7 +309,7 @@ function updateTraps(race, dt) {
       if (Math.abs(r.x - t.x) < 22 && Math.abs(r.y - t.y) < 14) {
         t.snap = 0.001;
         t.victim = r.id;
-        if (hit(race, r, 'trap', race.runners[t.owner])) { r.x = t.x; r.vx = 0; }
+        if (hit(race, r, 'trap', race.runners[t.owner], { x: t.x })) { r.x = t.x; r.vx = 0; }
         emit(race, 'trap', { id: r.id, x: t.x, y: t.y });
         break;
       }
@@ -268,9 +346,10 @@ function updatePlaces(race) {
   race.order = list;
 }
 
-// Advances the race by one fixed step. input: { jump, hold, item } for the player.
+// Advances the race. input: { jump, hold, item } for this phone's player.
 export function stepRace(race, dt, input = {}) {
   race.time += dt;
+  const guest = race.role === 'guest';
   if (race.phase === 'countdown') {
     const before = Math.ceil(race.time - dt);
     const now = Math.ceil(race.time);
@@ -278,17 +357,24 @@ export function stepRace(race, dt, input = {}) {
     if (race.time >= 0) { race.phase = 'race'; emit(race, 'go'); }
   }
   const T = race.T;
-  for (const b of T.boxes) if (b.t > 0) b.t = Math.max(0, b.t - dt);
+  if (!guest) for (const b of T.boxes) if (b.t > 0) b.t = Math.max(0, b.t - dt);
 
   for (const r of race.runners) {
     if (race.phase === 'countdown') continue;
+    if (r.ctrl === 'remote') { updateRemote(race, r, dt); continue; }
     let inp = { jump: false, hold: false };
-    if (r.isBot) inp = r.bot.think(race, dt);
+    if (r.ctrl === 'bot') inp = r.bot.think(race, dt);
     else if (!r.finished) {
       inp = { jump: !!input.jump, hold: !!input.hold };
       if (input.item) useItem(race, r);
-    } else inp = { jump: false, hold: false };
+    }
     updateRunner(race, r, dt, inp);
+  }
+  if (guest) {
+    // Saws keep flying between snapshots; anvils keep their clocks.
+    for (const s of race.saws) { s.x += s.vx * dt; s.spin += dt * 30; }
+    for (const a of race.anvils) a.t += dt;
+    return;
   }
   updateSaws(race, dt);
   updateTraps(race, dt);
@@ -296,19 +382,25 @@ export function stepRace(race, dt, input = {}) {
   updatePlaces(race);
 
   if (race.phase === 'race' && !race.allBots) {
-    const p = race.player;
-    if (p.finished) {
+    // Done shortly after every human is home, or 15 s after all but one runner finished.
+    const humansLeft = race.humans.filter((r) => !r.finished).length;
+    if (race.humans.length && humansLeft === 0) {
       race.doneTimer += dt;
-      if (race.doneTimer > 2.2) { race.phase = 'done'; emit(race, 'done'); }
-    } else if (race.finishedCount >= 3) {
-      // Everyone else is home: a short grace period, then the race closes.
-      race.doneTimer += dt;
-      race.closing = Math.max(0, 15 - race.doneTimer);
-      if (race.doneTimer > 15) { race.phase = 'done'; emit(race, 'done'); }
+      if (race.doneTimer > 2.2) finishRace(race);
+    } else if (race.finishedCount >= Math.max(1, race.runners.length - 1)) {
+      race.closeTimer = (race.closeTimer || 0) + dt;
+      race.closing = Math.max(0, 15 - race.closeTimer);
+      if (race.closeTimer > 15) finishRace(race);
     }
   }
 }
 
+function finishRace(race) {
+  updatePlaces(race);
+  race.phase = 'done';
+  emit(race, 'done', { results: results(race) });
+}
+
 export function results(race) {
-  return race.order.map((r, i) => ({ id: r.id, animal: r.animal, place: i + 1, time: r.finished ? r.finishTime : null, player: !r.isBot || r === race.player }));
+  return race.order.map((r, i) => ({ id: r.id, animal: r.animal, name: r.name, place: i + 1, time: r.finished ? r.finishTime : null }));
 }

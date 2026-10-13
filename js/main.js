@@ -7,6 +7,9 @@ import { drawAnimal, poseFor, drawPortrait, ANIMAL } from './animals.js';
 import { drawItemIcon } from './fx.js';
 import { initAudio, sfx, startMusic, stopMusic, setSound, setMusic } from './sound.js';
 import { THEMES, THEME_IDS } from './themes.js';
+import { createOnline } from './online.js';
+import { createHostSync, createGuestSync } from './netsync.js';
+import { cleanCode } from './net.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('scene');
@@ -18,9 +21,9 @@ const SAVE_KEY = 'man-run';
 const save = load();
 function load() {
   try {
-    return { animal: 'fox', map: 'forest', sound: true, music: true, races: 0, wins: 0, ...JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') };
+    return { animal: 'fox', map: 'forest', name: '', sound: true, music: true, races: 0, wins: 0, ...JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') };
   } catch {
-    return { animal: 'fox', map: 'forest', sound: true, music: true, races: 0, wins: 0 };
+    return { animal: 'fox', map: 'forest', name: '', sound: true, music: true, races: 0, wins: 0 };
   }
 }
 function store() {
@@ -72,12 +75,26 @@ function show(id, on) { $(id).classList.toggle('hidden', !on); }
 function toMenu() {
   mode = 'menu';
   race = null;
+  sync = null;
   stopMusic();
   show('menu', true);
   show('hud', false);
   show('pause', false);
   show('results', false);
+  show('lobby', false);
+  show('online', false);
   refreshMenu();
+}
+
+const nameOf = (r) => r.name || ANIMAL[r.animal].name;
+
+let toastTimer = 0;
+function toast(text) {
+  const el = $('toast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
 function refreshMenu() {
@@ -182,18 +199,28 @@ function drawPreview(t) {
 
 // ---- Race ----
 
+const pickMap = (m) => (m === 'mix' || !THEMES[m] ? THEME_IDS[Math.floor(Math.random() * THEME_IDS.length)] : m);
+
 function startRace() {
+  if (online.role) { hostRematch(); return; }
   initAudio();
   sfx('click');
   goFullscreen();
-  const map = save.map === 'mix' || !THEMES[save.map] ? THEME_IDS[Math.floor(Math.random() * THEME_IDS.length)] : save.map;
-  race = createRace({ playerAnimal: save.animal, autoPlayer: AUTO, theme: MAP_PARAM || map });
+  race = createRace({ playerAnimal: save.animal, autoPlayer: AUTO, theme: MAP_PARAM || pickMap(save.map) });
+  sync = null;
+  beginRace();
+}
+
+// Shared by solo and online races once `race` exists.
+function beginRace() {
   renderer.setRace(race);
   buildHeads();
   mode = 'race';
   show('menu', false);
   show('results', false);
   show('pause', false);
+  show('lobby', false);
+  show('online', false);
   show('hud', true);
   setItem(null);
   lastPlace = 0;
@@ -244,7 +271,8 @@ function updateHud(t) {
     el.classList.add('pop');
     lastPlace = p.place;
   }
-  // Item button roulette.
+  // Item button roulette, and keeping the button honest (online the host owns items).
+  if (p.rolling <= 0 && (p.item || null) !== shownItem) setItem(p.item || null);
   if (p.rolling > 0) {
     const id = ITEM_IDS[Math.floor(t * 14) % ITEM_IDS.length];
     if (id !== shownItem) { iconCanvas($('item-icon'), id); shownItem = id; sfx('roll'); }
@@ -303,17 +331,17 @@ function handleEvent(e) {
         else if (e.item === 'shield') sfx('shield');
       }
       if (!me && e.item !== 'lightning') {
-        if (near) banner(`${ANIMAL[r.animal].name}: ${ITEMS[e.item].name}!`);
+        if (near) banner(`${nameOf(r)}: ${ITEMS[e.item].name}!`);
       }
       break;
-    case 'lightning': sfx('lightning'); if (!me) banner(`${ANIMAL[r.animal].name} şimşek çaktı!`); break;
+    case 'lightning': sfx('lightning'); if (!me) banner(`${nameOf(r)} şimşek çaktı!`); break;
     case 'anvilWarn': if (me) { sfx('anvilWarn'); banner('Dikkat, örs geliyor!'); } break;
     case 'anvil': if (me || near) sfx('anvil'); break;
     case 'hit':
-      if (me) { sfx(e.kind === 'spikes' ? 'spikes' : 'hit'); hitStop = 0.08; }
+      if (me) { sfx(e.kind === 'spikes' ? 'spikes' : 'hit'); if (!sync) hitStop = 0.08; }
       else if (near && e.kind !== 'lightning') sfx('hit');
-      if (e.from === race.player.id && !me && e.kind !== 'lightning') hitStop = Math.max(hitStop, 0.05);
-      if (e.from === race.player.id && !me) banner(`${ANIMAL[r.animal].name} vuruldu!`);
+      if (e.from === race.player.id && !me && e.kind !== 'lightning' && !sync) hitStop = Math.max(hitStop, 0.05);
+      if (e.from === race.player.id && !me) banner(`${nameOf(r)} vuruldu!`);
       break;
     case 'blocked': if (me || near) sfx('blocked'); break;
     case 'sawBreak': if (near) sfx('sawBreak'); break;
@@ -326,9 +354,9 @@ function handleEvent(e) {
         sfx('finish');
         countdown(e.place === 1 ? 'BİRİNCİ!' : `${e.place}. OLDUN`, true);
         stopMusic();
-      } else banner(`${ANIMAL[r.animal].name} bitirdi! (${e.place}.)`);
+      } else banner(`${nameOf(r)} bitirdi! (${e.place}.)`);
       break;
-    case 'done': showResults(); break;
+    case 'done': showResults(e.results); break;
     default:
   }
 }
@@ -339,9 +367,10 @@ function fmtTime(s) {
   return `${m}:${sec.toFixed(2).padStart(5, '0')}`;
 }
 
-function showResults() {
+function showResults(given) {
+  if (mode === 'results') return;
   mode = 'results';
-  const res = results(race);
+  const res = given || results(race);
   const mine = res.find((r) => r.id === race.player.id);
   save.races++;
   if (mine.place === 1) save.wins++;
@@ -354,20 +383,35 @@ function showResults() {
   for (const r of res) {
     const li = document.createElement('li');
     if (r.id === race.player.id) li.className = 'me';
-    li.innerHTML = `<span class="medal">${medals[r.place - 1]}</span><img alt="" src="${portrait(r.animal, 80)}"><span class="nm">${ANIMAL[r.animal].name}${r.id === race.player.id ? ' (Sen)' : ''}</span><span class="tm">${r.time !== null ? fmtTime(r.time) : '—'}</span>`;
+    li.innerHTML = `<span class="medal">${medals[r.place - 1]}</span><img alt="" src="${portrait(r.animal, 80)}"><span class="nm"></span><span class="tm">${r.time !== null ? fmtTime(r.time) : '—'}</span>`;
+    li.querySelector('.nm').textContent = (r.name || ANIMAL[r.animal].name) + (r.id === race.player.id ? ' (Sen)' : '');
     list.appendChild(li);
   }
+  const guest = online.role === 'guest';
+  show('btn-again', !guest);
+  show('res-wait', guest);
+  $('btn-menu').textContent = !online.role ? 'Menü' : guest ? 'Odadan Çık' : 'Lobiye Dön';
   show('hud', false);
   show('results', true);
 }
 
 function pause() {
   if (mode !== 'race') return;
+  if (sync) {
+    // Online races can't stop for one player: just show the panel over the running race.
+    show('pause-online', true);
+    $('btn-quit').textContent = 'Odadan Çık';
+    show('pause', true);
+    return;
+  }
+  show('pause-online', false);
+  $('btn-quit').textContent = 'Menüye Dön';
   mode = 'pause';
   show('pause', true);
   stopMusic();
 }
 function resume() {
+  if (sync) { show('pause', false); return; }
   if (mode !== 'pause') return;
   mode = 'race';
   show('pause', false);
@@ -400,8 +444,8 @@ window.addEventListener('keydown', (e) => {
     else if (ITEM_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.itemQueued = true; }
     else if (e.code === 'Escape' || e.code === 'KeyP') pause();
   } else if (mode === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
-  else if (mode === 'menu' && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); startRace(); }
-  else if (mode === 'results' && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); startRace(); }
+  else if (mode === 'menu' && (e.code === 'Space' || e.code === 'Enter') && !e.target.closest?.('input') && $('online').classList.contains('hidden')) { e.preventDefault(); startRace(); }
+  else if (mode === 'results' && (e.code === 'Space' || e.code === 'Enter') && online.role !== 'guest') { e.preventDefault(); startRace(); }
 });
 window.addEventListener('keyup', (e) => { if (JUMP_KEYS.has(e.code)) jumpUp('k' + e.code); });
 
@@ -417,15 +461,20 @@ for (const id of ['touch-jump', 'btn-jump']) {
   el.addEventListener('lostpointercapture', (e) => jumpUp('p' + e.pointerId));
 }
 $('btn-item').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.itemQueued = true; });
-window.addEventListener('blur', () => { held.clear(); input.hold = false; pause(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+window.addEventListener('blur', () => { held.clear(); input.hold = false; if (!sync) pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !sync) pause(); });
 
 $('btn-race').addEventListener('click', startRace);
 $('btn-again').addEventListener('click', startRace);
-$('btn-menu').addEventListener('click', () => { sfx('click'); toMenu(); });
+$('btn-menu').addEventListener('click', () => {
+  sfx('click');
+  if (online.role === 'host') { race = null; sync = null; online.toLobby(); return; }
+  if (online.role) leaveOnline();
+  toMenu();
+});
 $('btn-pause').addEventListener('click', pause);
 $('btn-resume').addEventListener('click', () => { sfx('click'); resume(); });
-$('btn-quit').addEventListener('click', () => { sfx('click'); toMenu(); });
+$('btn-quit').addEventListener('click', () => { sfx('click'); if (online.role) leaveOnline(); toMenu(); });
 for (const id of ['btn-sound', 'btn-sound2']) $(id).addEventListener('click', () => { initAudio(); toggleSound(); });
 for (const id of ['btn-music', 'btn-music2']) $(id).addEventListener('click', () => { initAudio(); toggleMusic(); });
 $('btn-help').addEventListener('click', () => { initAudio(); sfx('click'); show('help', true); });
@@ -441,18 +490,194 @@ function checkRotate() {
 $('btn-rotate-ok').addEventListener('click', () => { rotateDismissed = true; checkRotate(); });
 window.addEventListener('resize', () => { renderer.resize(); checkRotate(); });
 
+// ---- Online ----
+
+let sync = null; // createHostSync / createGuestSync for the current online race
+const online = createOnline({
+  lobby: (state) => showLobby(state),
+  start: (info) => startOnlineRace(info),
+  message: (msg) => { if (sync && sync.receive && online.role === 'guest') sync.receive(msg); },
+  closed: (text) => { sync = null; toMenu(); toast(text); },
+  error: (text) => toast(text),
+});
+
+function setStatus(text, err) {
+  const el = $('online-status');
+  el.textContent = text;
+  el.classList.toggle('err', !!err);
+}
+
+function playerName() {
+  const n = $('player-name').value.trim().slice(0, 12);
+  save.name = n;
+  store();
+  return n || 'Oyuncu';
+}
+
+let busy = false;
+async function hostOnline() {
+  if (busy) return;
+  busy = true;
+  initAudio();
+  sfx('click');
+  setStatus('Oda açılıyor…');
+  try {
+    await online.host({ name: playerName(), animal: save.animal, map: save.map === 'mix' ? 'mix' : save.map });
+    setStatus('');
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+  busy = false;
+}
+
+async function joinOnline() {
+  if (busy) return;
+  const code = cleanCode($('join-code').value);
+  $('join-code').value = code;
+  if (code.length !== 4) { setStatus('Oda kodu 4 harf olmalı.', true); return; }
+  busy = true;
+  initAudio();
+  sfx('click');
+  setStatus('Bağlanılıyor…');
+  try {
+    await online.join(code, { name: playerName(), animal: save.animal });
+    setStatus('');
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+  busy = false;
+}
+
+function leaveOnline() {
+  online.leave();
+  sync = null;
+}
+
+function buildLobbyMaps() {
+  const row = $('lobby-maps');
+  for (const id of [...THEME_IDS, 'mix']) {
+    const b = document.createElement('button');
+    b.className = 'map-chip';
+    b.dataset.id = id;
+    b.textContent = id === 'mix' ? '🎲 Karışık' : `${THEMES[id].icon} ${THEMES[id].name}`;
+    b.addEventListener('click', () => { sfx('click'); online.setMap(id); });
+    row.appendChild(b);
+  }
+}
+
+function showLobby(state) {
+  // The host's lobby updates (someone left mid-race) wait until the host goes back to it.
+  if (state.role === 'host' && (mode === 'race' || mode === 'results') && race) return;
+  mode = 'lobby';
+  race = null;
+  sync = null;
+  stopMusic();
+  for (const id of ['menu', 'hud', 'pause', 'results', 'online']) show(id, false);
+  show('lobby', true);
+  $('lobby-code').textContent = state.code || '----';
+  const host = state.role === 'host';
+  show('lobby-host', host);
+  show('lobby-wait', !host);
+  $('lobby-hint').textContent = (host ? 'Arkadaşların "Arkadaşla Oyna"dan bu kodu girsin. ' : 'Odaya girdin! ') + 'Kartına dokunup hayvanını değiştirebilirsin.';
+  document.querySelectorAll('#lobby-maps .map-chip').forEach((el) => el.classList.toggle('on', el.dataset.id === state.map));
+  $('btn-bots').setAttribute('aria-pressed', String(state.bots));
+  const list = $('lobby-list');
+  list.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    const p = state.players[i];
+    const li = document.createElement('li');
+    if (p) {
+      const mine = p.pid === state.me;
+      if (mine) li.className = 'me';
+      li.innerHTML = `<img alt="" src="${portrait(p.animal, 96)}"><span class="pn"></span><small></small>`;
+      li.querySelector('.pn').textContent = p.name;
+      li.querySelector('small').textContent = [p.host ? 'Kurucu' : '', mine ? 'Sen' : ''].filter(Boolean).join(' · ');
+      if (mine) {
+        li.addEventListener('click', () => {
+          sfx('click');
+          const taken = new Set(state.players.filter((q) => q.pid !== p.pid).map((q) => q.animal));
+          const ids = ANIMALS.map((a) => a.id);
+          let k = ids.indexOf(p.animal);
+          do { k = (k + 1) % ids.length; } while (taken.has(ids[k]));
+          save.animal = ids[k];
+          store();
+          online.setAnimal(ids[k]);
+        });
+      }
+    } else {
+      li.className = 'empty';
+      li.innerHTML = state.bots ? '🤖<span>Bot</span>' : '<span>Boş</span>';
+    }
+    list.appendChild(li);
+  }
+}
+
+function startOnlineRace(info) {
+  initAudio();
+  goFullscreen();
+  race = createRace({ seed: info.seed, theme: info.theme, role: info.role, roster: info.roster, me: info.me });
+  if (info.role === 'host') {
+    sync = createHostSync(race, info.peers, (to, msg) => online.send(to, msg));
+    online.attachHostSync(sync);
+  } else {
+    sync = createGuestSync(race, (msg) => online.send(null, msg));
+  }
+  mode = 'race';
+  beginRace();
+}
+
+function hostStart() {
+  if (online.role !== 'host') return;
+  sfx('click');
+  startOnlineRace(online.start());
+}
+
+function hostRematch() {
+  if (online.role !== 'host') return;
+  hostStart();
+}
+
+function netTick(dt) {
+  sync.tick(dt);
+  if (online.role === 'guest') {
+    for (const e of sync.takeEvents()) handleEvent(e);
+    if (sync.silence > 6) {
+      leaveOnline();
+      toMenu();
+      toast('Oda kurucuyla bağlantı koptu.');
+    }
+  }
+}
+
+$('btn-online').addEventListener('click', () => {
+  initAudio();
+  sfx('click');
+  $('player-name').value = save.name || '';
+  setStatus('');
+  show('online', true);
+});
+$('btn-online-back').addEventListener('click', () => { sfx('click'); show('online', false); });
+$('btn-host').addEventListener('click', hostOnline);
+$('btn-join').addEventListener('click', joinOnline);
+$('join-code').addEventListener('input', (e) => { e.target.value = cleanCode(e.target.value); });
+$('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinOnline(); });
+$('btn-start').addEventListener('click', hostStart);
+$('btn-bots').addEventListener('click', () => { sfx('click'); online.setBots(!online.state.bots); });
+$('btn-leave').addEventListener('click', () => { sfx('click'); leaveOnline(); toMenu(); });
+buildLobbyMaps();
+
 // ---- Loop ----
 
 let last = performance.now();
-function frame(now) {
-  requestAnimationFrame(frame);
+function frame(now, fromRaf) {
+  if (fromRaf !== false) requestAnimationFrame((t) => frame(t, true));
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const t = now / 1000;
   if (mode === 'menu') drawPreview(t);
   let drawDt = mode === 'race' ? dt : 0;
   if (race && mode === 'race') {
-    if (hitStop > 0) {
+    if (hitStop > 0 && !sync) {
       // A tiny freeze on big hits makes them land.
       hitStop -= dt;
       drawDt = dt * 0.15;
@@ -465,12 +690,14 @@ function frame(now) {
         input.jumpQueued = false;
         input.itemQueued = false;
         stepRace(race, sdt, inp);
-        for (const e of race.events) handleEvent(e);
+        for (const e of race.events) { if (sync && sync.event) sync.event(e); handleEvent(e); }
         race.events.length = 0;
       }
     }
+    if (sync) netTick(dt);
     updateHud(t);
   }
+  if (race && mode === 'results' && sync) netTick(dt); // the room keeps talking on the results screen
   if (race) {
     renderer.draw(drawDt, t);
     if (mode === 'race') renderer.reportFrame(dt);
@@ -500,5 +727,21 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     }
     updateHud(performance.now() / 1000);
   };
-  window.manrun = { get race() { return race; }, startRace, renderer, input, advance, useItem: (id) => { race.player.item = id; race.player.rolling = 0; input.itemQueued = true; } };
+  // pump(): drive the game loop from a MessageChannel, which background tabs don't throttle
+  // (two tabs racing each other in the browser pane).
+  let pumping = false;
+  const pump = () => {
+    if (pumping) return;
+    pumping = true;
+    const ch = new MessageChannel();
+    let lastFrame = 0;
+    ch.port1.onmessage = () => {
+      if (!pumping) return;
+      const now = performance.now();
+      if (now - lastFrame >= 16) { lastFrame = now; frame(now, false); }
+      ch.port2.postMessage(0);
+    };
+    ch.port2.postMessage(0);
+  };
+  window.manrun = { get race() { return race; }, get mode() { return mode; }, get online() { return online; }, startRace, renderer, input, advance, pump, stopPump: () => { pumping = false; }, useItem: (id) => { race.player.item = id; race.player.rolling = 0; input.itemQueued = true; } };
 }

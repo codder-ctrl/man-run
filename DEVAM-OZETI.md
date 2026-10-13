@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-13. Canlı sürüm: **v0.2.0**.
+Son güncelleme: 2026-10-13. Canlı sürüm: **v0.2.0**. Yerelde hazır: **v0.3.0** (çevrim içi oyun; yüklenmedi, "yükle" bekleniyor).
 
 ## Proje
 
@@ -13,7 +13,7 @@ Son güncelleme: 2026-10-13. Canlı sürüm: **v0.2.0**.
   - Arkadaşlarla lokal oynanacak.
 - **İki plan (kullanıcı, 2026-10-13):**
   1. Oyunu birlikte geliştirmeye devam etmek.
-  2. Arkadaşlarla oynanabilir yapmak (çok oyunculu; kullanıcı önce Bluetooth demişti). Henüz başlanmadı.
+  2. Arkadaşlarla oynanabilir yapmak. v0.3.0'da yapıldı (oda kodu). Kullanıcının telefonlarda denemesi bekleniyor.
 - **Ayrıntılar:** Mimari ve test ipuçları `CLAUDE.md` içinde.
 
 ## Puan geçmişi
@@ -33,7 +33,21 @@ Son güncelleme: 2026-10-13. Canlı sürüm: **v0.2.0**.
 - Sesler kulak tırmalıyor.
 - Müzik baş ağrıtıyor.
 
-**v0.2.0 bu şikâyetlere cevap olarak yapıldı.** Kullanıcının puanı bekleniyor.
+**v0.2.0 bu şikâyetlere cevap olarak yapıldı.**
+
+**v0.2.0, kullanıcının puanları** (kullanıcı puanlarını `admin_puan.xlsx` dosyasında tutuyor; dosya .gitignore'da, yayınlanmıyor):
+
+| Akıcılık | Grafik | Efektler | Ses | Oynanış |
+|---|---|---|---|---|
+| 5 | 6 | 7 | 6 | 5 |
+
+**Notları:**
+
+- Akıcılık: Hâlâ Fun Run kadar akıcı değil, mekaniklerin gelişmesi gerekiyor.
+- Grafik, efektler, ses: Şimdilik iyi, sonra geliştirilecek.
+- Oynanış: **Eğilme** ve her karakterin kendi **mavi pati yeteneği** (hızlanma yeteneği) eklenecek.
+
+**Sıra (kullanıcı, 2026-10-13):** Önce arkadaşlarla oynanabilir hale getirmek, sonra oyunu geliştirmek (eğilme, mavi pati, akıcılık).
 
 ## v0.2.0'da olanlar (görsel tur)
 
@@ -65,6 +79,27 @@ Son güncelleme: 2026-10-13. Canlı sürüm: **v0.2.0**.
   - Kare zamanlaması ekranın yenileme hızına göre bölünüyor, takılmıyor.
   - Kamera daha sabit.
   - Yavaş telefonda oyun çözünürlüğü kendisi düşürüyor.
+
+## v0.3.0'da olanlar (arkadaşla oyna)
+
+- **Bluetooth neden yok:** Telefon tarayıcıları Bluetooth ile iki telefonu bağlayamıyor (Android'de tarayıcı görünür olamıyor, iPhone'da hiç yok). Kullanıcı **oda kodunu** seçti. Boş yerlere bot konup konmayacağını **oda kuran seçiyor**.
+- **Nasıl oynanıyor:**
+  - Menü → "Arkadaşla Oyna" → adını yaz → "Oda Kur" ya da 4 harfli kodu yazıp "Katıl".
+  - Bekleme odasında 4 kart var. Kendi kartına dokunarak hayvanını değiştirebilirsin.
+  - Oda kuran haritayı ve botları seçip "BAŞLAT"a basar.
+- **Yarış sırasında:**
+  - Yarışı oda kuranın telefonu yönetir: eşyalar, vuruşlar, kutular, sıralama.
+  - Herkes kendi zıplamasını kendi telefonunda anında yapar.
+  - Etiketlerde arkadaşların adları görünür.
+- **Sonrası:**
+  - Sonuç ekranında oda kuran "Tekrar Yarış" ya da "Lobiye Dön" seçer.
+  - Ayrılan ya da 5 saniye sessiz kalan arkadaşın yerine bot geçer. Oda kuran çıkarsa oda kapanır.
+- **Bağlantı:** PeerJS'in ücretsiz sunucusu yalnızca telefonları tanıştırıyor; oyun verisi telefondan telefona akıyor. Bağlanırken internet gerekiyor.
+- **Test:** İki tarayıcı sekmesiyle gerçek bağlantıda denendi. Çalışanlar:
+  - Kur, katıl, yarış, eşya kullanma, vurulma
+  - Ayrılınca yerine bot geçmesi
+  - Sonuç ekranı, tekrar yarış, lobiye dönüş
+  - Yanlış kod uyarısı
 
 ## Öğrenilenler
 

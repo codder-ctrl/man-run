@@ -39,10 +39,11 @@ export function createBot(r, skill, R) {
   };
 
   function rubberBand(race) {
-    // Far ahead of the player: ease off a little. Far behind: push a little.
-    const p = race.player;
-    if (p.finished || r.finished) { bot.speedMul = 1; return; }
-    const gap = r.x - p.x;
+    // Far ahead of the humans: ease off a little. Far behind them: push a little.
+    const humans = (race.humans || []).filter((h) => !h.finished && h !== r);
+    if (r.finished || !humans.length) { bot.speedMul = 1; return; }
+    let gap = Infinity;
+    for (const h of humans) if (Math.abs(r.x - h.x) < Math.abs(gap)) gap = r.x - h.x;
     const target = gap > 900 ? 0.94 : gap > 500 ? 0.97 : gap < -900 ? 1.07 : gap < -450 ? 1.03 : 1;
     bot.speedMul += (target - bot.speedMul) * 0.02;
   }

@@ -33,6 +33,7 @@
           <div id="animal-grid" class="animal-grid"></div>
           <div id="map-row" class="map-row"></div>
           <button id="btn-race" class="big-btn">YARIŞ!</button>
+          <button id="btn-online" class="mid-btn online-btn">👫 Arkadaşla Oyna</button>
           <div class="menu-stats" id="menu-stats"></div>
         </div>
       </div>
@@ -63,11 +64,52 @@
     <button id="btn-item" class="round-btn item-btn empty" aria-label="Eşya kullan"><canvas id="item-icon" width="120" height="120"></canvas><small id="item-name"></small></button>
   </section>
 
+  <!-- Online: host or join -->
+  <section id="online" class="screen dim hidden">
+    <div class="panel">
+      <h2>Arkadaşla Oyna</h2>
+      <label class="field">Adın
+        <input id="player-name" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Oyuncu">
+      </label>
+      <button id="btn-host" class="big-btn">Oda Kur</button>
+      <div class="or">ya da</div>
+      <div class="join-row">
+        <input id="join-code" maxlength="4" autocomplete="off" spellcheck="false" placeholder="KOD" inputmode="text" autocapitalize="characters">
+        <button id="btn-join" class="mid-btn">Katıl</button>
+      </div>
+      <p id="online-status" class="status"></p>
+      <button id="btn-online-back" class="chip">← Geri</button>
+    </div>
+  </section>
+
+  <!-- Online: lobby -->
+  <section id="lobby" class="screen dim hidden">
+    <div class="panel wide">
+      <div class="lobby-head">
+        <div>Oda kodu</div>
+        <div id="lobby-code" class="lobby-code">----</div>
+        <div class="hint" id="lobby-hint">Arkadaşların "Arkadaşla Oyna"dan bu kodu girsin.</div>
+      </div>
+      <ul id="lobby-list" class="lobby-list"></ul>
+      <div id="lobby-host">
+        <div id="lobby-maps" class="map-row"></div>
+        <button id="btn-bots" class="chip" aria-pressed="true">🤖 Boş yerlere bot</button>
+        <button id="btn-start" class="big-btn">BAŞLAT</button>
+        <p class="hint">Yarış boyunca senin ekranın açık kalmalı: yarışı senin telefonun yönetiyor.</p>
+      </div>
+      <p id="lobby-wait" class="status">Oda kurucunun yarışı başlatması bekleniyor…</p>
+      <button id="btn-leave" class="chip">Odadan Çık</button>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+
   <!-- Pause -->
   <section id="pause" class="screen dim hidden">
     <div class="panel">
       <h2>Mola</h2>
       <button id="btn-resume" class="big-btn">Devam</button>
+      <p id="pause-online" class="hint hidden">Çevrim içi yarış durmuyor, koşmaya devam ediyorsun!</p>
       <button id="btn-quit" class="mid-btn">Menüye Dön</button>
       <div class="menu-foot">
         <button id="btn-sound2" class="chip" aria-pressed="true">🔊 Ses</button>
@@ -81,6 +123,7 @@
     <div class="panel wide">
       <h2 id="res-title">1. oldun!</h2>
       <ol id="res-list" class="res-list"></ol>
+      <p id="res-wait" class="status hidden">Oda kurucu yeni yarışı başlatınca devam edeceksin.</p>
       <div class="res-btns">
         <button id="btn-again" class="big-btn">Tekrar Yarış</button>
         <button id="btn-menu" class="mid-btn">Menü</button>
