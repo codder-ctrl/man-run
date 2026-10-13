@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><title>Man Run poz laboratuvarı</title>
+<style>body{margin:0;background:#9fd6f0;font:12px sans-serif}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+import { drawAnimal, poseFor, drawTrap } from '../js/animals.js';
+import { ANIMALS } from '../js/config.js';
+const q = new URLSearchParams(location.search);
+const cell = +(q.get('cell') || 150);
+const states = [
+  { name: 'dur', r: { vx: 0, vy: 0, grounded: true } },
+  { name: 'koş 0', r: { vx: 300, grounded: true, runPhase: 0 } },
+  { name: 'koş .25', r: { vx: 300, grounded: true, runPhase: 0.25 } },
+  { name: 'koş .5', r: { vx: 300, grounded: true, runPhase: 0.5 } },
+  { name: 'zıpla', r: { vx: 300, vy: -400, grounded: false } },
+  { name: 'düş', r: { vx: 300, vy: 600, grounded: false } },
+  { name: 'sersem', r: { vx: 0, grounded: true, stun: 1, stunKind: 'saw' } },
+  { name: 'şimşek', r: { vx: 0, grounded: true, stun: 1, stunKind: 'lightning' } },
+  { name: 'kapan', r: { vx: 0, grounded: true, stun: 1, stunKind: 'trap' } },
+  { name: 'kazandı', r: { vx: 0, grounded: true, finished: true } },
+];
+const c = document.getElementById('c');
+const ids = (q.get('ids') || ANIMALS.map((a) => a.id).join(',')).split(',');
+const dpr = devicePixelRatio || 1;
+c.width = cell * states.length * dpr; c.height = cell * ids.length * dpr;
+c.style.width = cell * states.length + 'px'; c.style.height = cell * ids.length + 'px';
+const g = c.getContext('2d');
+const t = +(q.get('t') || 0.4);
+ids.forEach((id, row) => states.forEach((s, col) => {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.translate(col * cell + cell / 2, row * cell + cell * 0.8);
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillText(s.name, -cell / 2 + 4, -cell * 0.8 + 12);
+  g.fillStyle = '#5a9a3a'; g.fillRect(-cell / 2, 0, cell, 3);
+  const k = cell / 95;
+  g.scale(k, k);
+  drawAnimal(g, id, poseFor({ id: row, ...s.r }, t), t);
+}));
+</script></body></html>

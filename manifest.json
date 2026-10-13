@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Man Run",
+  "short_name": "Man Run",
+  "description": "Fun Run tarzı hayvanlı koşu yarışı: zıpla, eşya kullan, ilk sen bitir!",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#5fb4ea",
+  "theme_color": "#2a1b17",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

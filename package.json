@@ -1,0 +1,11 @@
+{
+  "name": "man-run",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Fun Run tarzı, tarayıcıda oynanan hayvanlı koşu yarışı (build adımı yok).",
+  "scripts": {
+    "start": "python -m http.server 8004",
+    "test": "node --test \"tests/*.test.js\""
+  }
+}

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#2a1b17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Man Run</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Lilita+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- Menu -->
+  <section id="menu" class="screen">
+    <div class="menu-sky"></div>
+    <div class="menu-inner">
+      <h1 class="logo"><span class="l1">MAN</span><span class="l2">RUN</span></h1>
+      <div class="menu-row">
+        <div class="hero-stage">
+          <canvas id="hero-preview" width="220" height="200"></canvas>
+          <div id="hero-name" class="hero-name">Tilki</div>
+        </div>
+        <div class="menu-side">
+          <div class="pick-title">Karakterini seç</div>
+          <div id="animal-grid" class="animal-grid"></div>
+          <div id="map-row" class="map-row"></div>
+          <button id="btn-race" class="big-btn">YARIŞ!</button>
+          <div class="menu-stats" id="menu-stats"></div>
+        </div>
+      </div>
+      <div class="menu-foot">
+        <button id="btn-sound" class="chip" aria-pressed="true">🔊 Ses</button>
+        <button id="btn-music" class="chip" aria-pressed="true">🎵 Müzik</button>
+        <button id="btn-help" class="chip">❔ Nasıl oynanır</button>
+      </div>
+    </div>
+    <div id="version" class="version"></div>
+  </section>
+
+  <!-- In-race HUD -->
+  <section id="hud" class="hidden">
+    <div class="hud-top">
+      <div id="place" class="place"><span id="place-n">1</span><small>/4</small></div>
+      <div class="progress">
+        <div class="progress-bar"></div>
+        <div class="progress-flag">🏁</div>
+        <div id="progress-heads"></div>
+      </div>
+      <button id="btn-pause" class="round-btn small" aria-label="Duraklat">❚❚</button>
+    </div>
+    <div id="banner" class="banner"></div>
+    <div id="count" class="count"></div>
+    <div id="touch-jump" class="touch-jump"></div>
+    <button id="btn-jump" class="round-btn jump-btn" aria-label="Zıpla"><span>▲</span><small>ZIPLA</small></button>
+    <button id="btn-item" class="round-btn item-btn empty" aria-label="Eşya kullan"><canvas id="item-icon" width="120" height="120"></canvas><small id="item-name"></small></button>
+  </section>
+
+  <!-- Pause -->
+  <section id="pause" class="screen dim hidden">
+    <div class="panel">
+      <h2>Mola</h2>
+      <button id="btn-resume" class="big-btn">Devam</button>
+      <button id="btn-quit" class="mid-btn">Menüye Dön</button>
+      <div class="menu-foot">
+        <button id="btn-sound2" class="chip" aria-pressed="true">🔊 Ses</button>
+        <button id="btn-music2" class="chip" aria-pressed="true">🎵 Müzik</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="results" class="screen dim hidden">
+    <div class="panel wide">
+      <h2 id="res-title">1. oldun!</h2>
+      <ol id="res-list" class="res-list"></ol>
+      <div class="res-btns">
+        <button id="btn-again" class="big-btn">Tekrar Yarış</button>
+        <button id="btn-menu" class="mid-btn">Menü</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Help -->
+  <section id="help" class="screen dim hidden">
+    <div class="panel wide help">
+      <h2>Nasıl oynanır?</h2>
+      <p>Karakterin kendi koşar. Sen sadece <b>zıplar</b> ve <b>eşya kullanırsın</b>. Bitiş bayrağına ilk varan kazanır!</p>
+      <ul>
+        <li><b>Zıpla:</b> ekranın sol tarafına dokun (bilgisayarda <kbd>Boşluk</kbd>). Basılı tutarsan daha yükseğe zıplarsın.</li>
+        <li><b>Eşya:</b> sağ alttaki düğme (bilgisayarda <kbd>E</kbd>). Eşyaları <span class="qbox">?</span> kutularından alırsın.</li>
+      </ul>
+      <div id="help-items" class="help-items"></div>
+      <p class="tip">Sarı oklar seni hızlandırır, çamur yavaşlatır, dikenler sersemletir. Çukura düşersen biraz geriden devam edersin.</p>
+      <button id="btn-help-close" class="big-btn">Anladım!</button>
+    </div>
+  </section>
+
+  <!-- Rotate hint (phones held upright) -->
+  <div id="rotate" class="rotate hidden">
+    <div class="phone">📱</div>
+    <p>Telefonu yan çevir</p>
+    <button id="btn-rotate-ok" class="chip">Böyle devam et</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
