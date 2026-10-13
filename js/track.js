@@ -7,6 +7,7 @@
 //     the strip's ends are cliffs/walls.
 //   kind 'block' — a stone wall standing on the ground.
 //   kind 'plat'  — a one-way ledge (land on it from above, pass through from below and the sides).
+//   kind 'roof'  — a low rock overhang 32 units above the ground: only a ducking runner fits under.
 
 import { THEMES } from './themes.js';
 
@@ -296,6 +297,15 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       gapDown(rnd(60, 90), rnd(110, 150));
       run(rnd(260, 340));
     },
+    duck() {
+      // A low rock overhang: too tall to jump over, slide under it.
+      respawn();
+      run(rnd(160, 220));
+      const w = Math.round(rnd(90, 170));
+      T.solids.push({ x, y: gy - 32 - 130, w, h: 130, kind: 'roof' });
+      run(w);
+      run(rnd(160, 220));
+    },
     boxes() {
       respawn();
       const s = x;
@@ -306,8 +316,8 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
     },
   };
 
-  const easy = ['flat', 'rolling', 'rolling', 'hillUp', 'hillDown', 'hillUp', 'hillDown', 'valley', 'pit', 'stepUp', 'stepDown', 'wall', 'spikes', 'boxes', 'pad', 'mud'];
-  const hard = ['pit', 'doublePit', 'hillPit', 'stairs', 'wall', 'wallSpikes', 'spikes', 'island', 'upper', 'padJump', 'drop', 'hillUp', 'hillDown', 'valley', 'rolling', 'mud'];
+  const easy = ['flat', 'rolling', 'rolling', 'hillUp', 'hillDown', 'hillUp', 'hillDown', 'valley', 'pit', 'stepUp', 'stepDown', 'wall', 'spikes', 'boxes', 'pad', 'mud', 'duck'];
+  const hard = ['pit', 'doublePit', 'hillPit', 'stairs', 'wall', 'wallSpikes', 'spikes', 'island', 'upper', 'padJump', 'drop', 'hillUp', 'hillDown', 'valley', 'rolling', 'mud', 'duck'];
 
   // Start line area (the ground reaches back off screen behind the start).
   run(700);
@@ -359,7 +369,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
     d.y = g ? surfaceAt(g, d.x) : Infinity;
     d.slope = slopeAt(g, d.x);
   }
-  const blocks = T.solids.filter((s) => s.kind === 'block');
+  const blocks = T.solids.filter((s) => s.kind === 'block' || s.kind === 'roof');
   T.deco = T.deco.filter((d) => d.y < Infinity && Math.abs(d.slope) < 0.35 && !blocks.some((b) => d.x > b.x - 24 && d.x < b.x + b.w + 24) && !T.spikes.some((s) => d.x > s.x - 20 && d.x < s.x + s.w + 20) && !T.mud.some((m) => d.x > m.x - 10 && d.x < m.x + m.w + 10) && !T.pads.some((p) => d.x > p.x - 10 && d.x < p.x + p.w + 10));
   T.back = backProfile(T, R);
   return T;
@@ -374,7 +384,8 @@ function undulate(T, R) {
   for (const m of T.mud) zones.push([m.x, m.x + m.w]);
   for (const p of T.pads) zones.push([p.x - 20, p.x + p.w + 20]);
   for (const s of T.solids) {
-    if (s.kind === 'block' || s.kind === 'plat') zones.push([s.x - 10, s.x + s.w + 10]);
+    if (s.kind === 'roof') zones.push([s.x - 70, s.x + s.w + 10]); // flat for the warning sign too
+    else if (s.kind === 'block' || s.kind === 'plat') zones.push([s.x - 10, s.x + s.w + 10]);
     else { zones.push([s.x, s.x + 50]); zones.push([s.x + s.w - 50, s.x + s.w]); }
   }
   const p1 = R() * 10;

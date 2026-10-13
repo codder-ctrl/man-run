@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-13. Canlı sürüm: **v0.2.0**. Yerelde hazır: **v0.3.0** (çevrim içi oyun; yüklenmedi, "yükle" bekleniyor).
+Son güncelleme: 2026-10-13. Canlı sürüm: **v0.3.0**. Yerelde hazır: **v0.4.0** (telefona yükleme düğmesi, eğilme, mavi pati; "yükle" bekleniyor).
 
 ## Proje
 
@@ -100,6 +100,31 @@ Son güncelleme: 2026-10-13. Canlı sürüm: **v0.2.0**. Yerelde hazır: **v0.3.
   - Ayrılınca yerine bot geçmesi
   - Sonuç ekranı, tekrar yarış, lobiye dönüş
   - Yanlış kod uyarısı
+
+## v0.4.0'da olanlar
+
+- **Telefona yükleme:** Kullanıcı telefonda "indiremedim" dedi.
+  - Menüye **📲 Telefona Yükle** düğmesi eklendi. Android'de tek dokunuşla yükler.
+  - Tek dokunuş olmayan yerlerde (iPhone Safari, Samsung Internet, Instagram/Telegram gibi uygulama içi tarayıcılar) adım adım anlatım gösterir.
+  - Uygulama bilgisi `display: standalone` + `display_override: fullscreen` oldu.
+- **Eğilme:**
+  - **EĞİL** düğmesi (zıplamanın yanında) basılı tutulunca karakter geriye yatıp ayaklarıyla kayar. Havadayken hızla yere iner.
+  - Pistte yeni engel: **alçak kaya tavanı**. Önünde sarı uyarı tabelası var. Üstünden atlanamaz, altından kayılır. Botlar da kayıyor; geç kalırsa takılıyor.
+- **Mavi pati:**
+  - 🐾 düğmesi 15 saniyede dolar. Dolunca parlar, dokununca karakter hızlanır.
+  - Arkasında mavi hayalet izler ve yerde mavi pati izleri kalır, üstünde yeteneğin adı çıkar.
+  - Her hayvanın kendi yeteneği var; hepsi aşağı yukarı aynı mesafe kazandırıyor:
+
+    | Hayvan | Yetenek | Tarzı |
+    |---|---|---|
+    | Tilki | Tilki Atılışı | kısa, çok hızlı |
+    | Ayı | Ayı Gücü | uzun, güçlü |
+    | Tavşan | Tavşan Sıçrayışı | çevik |
+    | Kurt | Kurt Koşusu | dengeli |
+    | Kedi | Kedi Çevikliği | hızlı |
+    | Panda | Bambu Rüzgârı | uzun soluklu |
+
+  - Menüde seçili hayvanın yeteneği yazıyor. Botlar da kullanıyor, çevrim içi oyunda da çalışıyor.
 
 ## Öğrenilenler
 

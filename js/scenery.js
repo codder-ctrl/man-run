@@ -364,6 +364,7 @@ function paintChunk(g, T, th, view) {
   for (const s of near) if (s.kind === 'ground') drawGround(g, s, th, view);
   for (const s of near) if (s.kind === 'block') drawBlock(g, s, th);
   for (const s of near) if (s.kind === 'plat') drawLedge(g, s, th);
+  for (const s of near) if (s.kind === 'roof') drawRoof(g, s, th);
   for (const sp of T.spikes) if (sp.x + sp.w > view.x0 - 20 && sp.x < view.x1 + 20) drawSpikes(g, sp);
   for (const d of T.deco) if (STATIC_DECO.has(d.kind) && d.x > view.x0 - 80 && d.x < view.x1 + 80) drawDeco(g, d, 0, th);
 }
@@ -610,6 +611,62 @@ export function drawBlock(g, s, th) {
     line(g, roundRect(s.x, s.y, s.w, s.h, 6), INK, 2.4);
   }
   drawCap(g, () => s.y + 2, s.x - 4, s.x + s.w + 4, th, true, true, s.x);
+}
+
+// Low rock overhang: hazy pillars behind suggest an arch going back; the slab hangs 32 units
+// above the ground with roots dangling, and casts a dark band on the ground below.
+function drawRoof(g, s, th) {
+  const D = th.dirt;
+  const bottom = s.y + s.h;
+  const ground = bottom + 32;
+  // Shadow on the ground under it.
+  g.fillStyle = rgba(D.deep, 0.35);
+  g.beginPath();
+  g.ellipse(s.x + s.w / 2, ground - 2, s.w / 2 + 14, 7, 0, 0, TAU);
+  g.fill();
+  // Pillars behind the lane.
+  for (const px of [s.x + 6, s.x + s.w - 20]) {
+    g.fillStyle = mix(th.back.face, th.back.haze, 0.35);
+    g.fillRect(px, bottom - 4, 14, 36);
+    g.fillStyle = rgba(INK, 0.25);
+    g.fillRect(px + 10, bottom - 4, 4, 36);
+  }
+  const body = (c) => {
+    c.moveTo(s.x - 8, s.y + 10);
+    c.quadraticCurveTo(s.x - 8, s.y, s.x + 6, s.y);
+    c.lineTo(s.x + s.w - 6, s.y);
+    c.quadraticCurveTo(s.x + s.w + 8, s.y, s.x + s.w + 8, s.y + 10);
+    c.lineTo(s.x + s.w + 4, bottom - 10);
+    c.quadraticCurveTo(s.x + s.w + 2, bottom + 2, s.x + s.w - 12, bottom);
+    for (let x = s.x + s.w - 12; x > s.x + 12; x -= 14) c.lineTo(x, bottom + (Math.sin(x * 0.7) > 0 ? 3 : 0));
+    c.quadraticCurveTo(s.x - 2, bottom + 2, s.x - 4, bottom - 10);
+    c.closePath();
+  };
+  blob(g, body, D.base, { ow: 2.4, depth: 5, shade: D.deep });
+  g.save();
+  g.beginPath();
+  body(g);
+  g.clip();
+  cobbles(g, () => s.y, s.x - 10, s.x + s.w + 10, bottom + 4, [D.stoneA, D.stoneB, D.stoneC], D.mortar, 6, 30, 24, 11);
+  const sh = g.createLinearGradient(0, bottom - 40, 0, bottom + 4);
+  sh.addColorStop(0, rgba(D.deep, 0));
+  sh.addColorStop(1, rgba(D.deep, 0.55));
+  g.fillStyle = sh;
+  g.fillRect(s.x - 10, bottom - 40, s.w + 20, 46);
+  g.restore();
+  line(g, body, INK, 2.4);
+  // Roots and vines hanging from the edge (they stay above head height of a sliding runner).
+  for (let x = s.x + 10; x < s.x + s.w - 6; x += 17) {
+    const R = rng(Math.floor(x) * 3 + 5);
+    const len = 4 + R() * 7;
+    line(g, (c) => { c.moveTo(x, bottom); c.quadraticCurveTo(x + 2, bottom + len * 0.6, x - 1, bottom + len); }, th.id === 'snow' ? '#dff4ff' : th.id === 'desert' ? '#8a5a2e' : '#3f8a35', 2.2);
+  }
+  drawCap(g, () => s.y + 2, s.x - 8, s.x + s.w + 8, th, true, true, s.x + 3);
+  // A warning sign at the entrance: slide!
+  const sx = s.x - 46;
+  blob(g, roundRect(sx - 2, ground - 40, 4, 40, 1.5), '#7a4f2e', { ow: 1.6, depth: 1 });
+  blob(g, roundRect(sx - 14, ground - 56, 28, 22, 4), '#ffd23f', { ow: 2, depth: 2 });
+  line(g, (c) => { c.moveTo(sx - 6, ground - 50); c.lineTo(sx, ground - 42); c.lineTo(sx + 6, ground - 50); }, INK, 3);
 }
 
 // One-way ledge: a thick slab of earth with a lip, tapering underneath.

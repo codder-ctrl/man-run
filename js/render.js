@@ -1,7 +1,7 @@
 // Draws the race: camera, layered world, runners, items and effects. Turns race events into
 // effects (dust, shards, bolts, shake, hit-stop).
 
-import { VIEW_H } from './config.js';
+import { VIEW_H, ABILITIES } from './config.js';
 import { floorBelow } from './track.js';
 import { drawAnimal, poseFor, drawTrap, ANIMAL } from './animals.js';
 import { createBackdrop, createTerrain, createForeground, createWeather, drawMud, drawPad, drawBox, drawDeco, drawFinish, LIVE_DECO, THEMES } from './scenery.js';
@@ -103,6 +103,11 @@ export function createRenderer(canvas) {
       case 'anvil': fx.landing(e.x, e.y, dust, true); if (race.runners[e.id] === race.player) cam.shake = 14; break;
       case 'fall': break;
       case 'respawn': fx.poof(r.x, r.y - 26); fx.text(r.x, r.y - 72, me ? 'Tekrar!' : '', '#ffffff'); break;
+      case 'paw':
+        fx.ring(r.x, r.y - 26, 44, '#4aa8ff');
+        fx.twinkles(r.x, r.y - 26, 8, '#8fd0ff');
+        fx.text(r.x, r.y - 78, ABILITIES[r.animal].name, '#8fd0ff');
+        break;
       case 'use':
         if (e.item === 'speed') { fx.ring(r.x, r.y - 26, 40, '#ff9a4a'); fx.twinkles(r.x, r.y - 26, 6, '#ffb36b'); }
         if (e.item === 'shield') fx.ring(r.x, r.y - 26, 44, '#8ad8ff');
@@ -121,7 +126,7 @@ export function createRenderer(canvas) {
     const p = race.player;
     const T = race.T;
     // Camera: x stays locked to the player (smooth lead when boosted), y eases with a little lag.
-    const boosting = p.boost > 0 || p.pad > 0;
+    const boosting = p.boost > 0 || p.pad > 0 || p.dash > 0;
     cam.look += ((boosting ? 70 : 0) - cam.look) * Math.min(1, dt * 2.5);
     const tgt = camTarget(p);
     cam.x += (tgt.x - cam.x) * Math.min(1, dt * 14);
@@ -239,11 +244,11 @@ export function createRenderer(canvas) {
     if (!tr) { tr = { list: [], acc: 0 }; trails.set(r.id, tr); }
     for (const g of tr.list) g.age += dt;
     tr.list = tr.list.filter((g) => g.age < 0.25);
-    if ((r.boost > 0 || r.pad > 0) && r.dead <= 0 && r.vx > 200) {
+    if ((r.boost > 0 || r.pad > 0 || r.dash > 0) && r.dead <= 0 && r.vx > 200) {
       tr.acc += dt;
       if (tr.acc > 0.045) {
         tr.acc = 0;
-        tr.list.push({ x: r.x, y: r.y, rot: r.drawRot || 0, phase: r.runPhase, age: 0, grounded: r.grounded, vy: r.vy, color: r.boost > 0 ? '#ff8a3a' : '#ffd23f' });
+        tr.list.push({ x: r.x, y: r.y, rot: r.drawRot || 0, phase: r.runPhase, age: 0, grounded: r.grounded, vy: r.vy, duck: r.duck, color: r.dash > 0 ? '#4aa8ff' : r.boost > 0 ? '#ff8a3a' : '#ffd23f' });
       }
     }
   }
@@ -262,7 +267,7 @@ export function createRenderer(canvas) {
         ctx.save();
         ctx.translate(g.x, g.y);
         ctx.rotate(g.rot);
-        const saved = { ...r, x: g.x, y: g.y, runPhase: g.phase, grounded: g.grounded, vy: g.vy };
+        const saved = { ...r, x: g.x, y: g.y, runPhase: g.phase, grounded: g.grounded, vy: g.vy, duck: g.duck };
         drawAnimalTinted(ctx, r.animal, poseFor(saved, t), t, g.color);
         ctx.restore();
       }
@@ -273,13 +278,18 @@ export function createRenderer(canvas) {
     if (r.invuln > 0 && r.stun <= 0 && Math.floor(t * 14) % 2 === 0) ctx.globalAlpha = 0.45;
     const fy = floorBelow(race.T, r.x, r.y - 2);
     if (fy < Infinity && fy - r.y < 240) shadow(ctx, r.x, fy, 19 * (1 - (fy - r.y) / 320), 0.32);
-    if (r.boost > 0 || r.pad > 0) {
+    if (r.boost > 0 || r.pad > 0 || r.dash > 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      glow(ctx, r.x - 10, r.y - 26, 40, r.boost > 0 ? '#ff8a3a' : '#ffd23f', 0.4);
+      glow(ctx, r.x - 10, r.y - 26, 40, r.dash > 0 ? '#4aa8ff' : r.boost > 0 ? '#ff8a3a' : '#ffd23f', 0.42);
       ctx.restore();
       if (Math.random() < 0.6) fx.speedLine(r.x - 34 - Math.random() * 24, r.y - 8 - Math.random() * 44);
     }
+    // Blue paw prints while dashing.
+    if (r.dash > 0 && r.grounded) {
+      if (r.pawX === undefined || Math.abs(r.x - r.pawX) > 34) { r.pawX = r.x; r.pawSide = !r.pawSide; fx.pawPrint(r.x - 6 + (r.pawSide ? 4 : -4), r.y); }
+    } else r.pawX = undefined;
+    if (r.duck && r.grounded && r.vx > 100 && Math.random() < dt * 25) fx.dust(r.x + 10, r.y, 1, -1, theme.dust);
     if (r.stunKind === 'lightning' && r.stun > 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -357,7 +367,7 @@ export function createRenderer(canvas) {
     }
   }
 
-  return { resize, setRace, onEvent, draw, fx, reportFrame, get scale() { return scale; }, get quality() { return quality; } };
+  return { resize, setRace, onEvent, draw, fx, reportFrame, get scale() { return scale; }, get quality() { return quality; }, get debug() { return { trails, cam, race }; } };
 }
 
 // The animal drawn as a flat colored ghost (afterimages).

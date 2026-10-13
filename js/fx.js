@@ -96,6 +96,9 @@ export function createFx() {
         add({ k: 'puff', x: x + rand(-12, 12), y: y - Math.random() * 30, vx: rand(-25, 25), vy: rand(-80, -40), drag: 1, life: rand(0.7, 1.1), age: 0, r: rand(6, 11), color });
       }
     },
+    pawPrint(x, y, color = '#4aa8ff') {
+      add({ k: 'pawp', x, y, vx: 0, vy: 0, life: 1.1, age: 0, r: 5, rot: Math.random() * 0.4 - 0.2, color });
+    },
     speedLine(x, y) {
       add({ k: 'line', x, y, vx: -320, vy: 0, life: 0.22, age: 0, r: rand(18, 36), color: '#ffffff' });
     },
@@ -167,6 +170,17 @@ export function createFx() {
           ctx.globalAlpha = Math.min(1, a * 3);
           ctx.fillStyle = p.color; ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r);
           ctx.restore();
+        } else if (p.k === 'pawp') {
+          // A blue paw print left on the ground.
+          ctx.globalAlpha = Math.min(1, a * 1.6) * 0.85;
+          ctx.save();
+          ctx.translate(p.x, p.y - 2);
+          ctx.rotate(p.rot);
+          ctx.scale(1, 0.55);
+          flat(ctx, ellipse(0, 0, p.r, p.r * 0.85), p.color);
+          for (let i = 0; i < 4; i++) flat(ctx, circle(-p.r * 0.95 + i * p.r * 0.63, -p.r * 1.25 + (i === 0 || i === 3 ? p.r * 0.35 : 0), p.r * 0.36), p.color);
+          ctx.restore();
+          ctx.globalAlpha = 1;
         } else if (p.k === 'line') {
           ctx.globalAlpha = a * 0.75;
           line(ctx, (c) => { c.moveTo(p.x, p.y); c.lineTo(p.x + p.r, p.y); }, p.color, 2.2);

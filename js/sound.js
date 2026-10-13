@@ -143,6 +143,8 @@ const SFX = {
   blocked() { bell(1760, 0, 0.06, 0.3); tone({ f: 880, f2: 1320, dur: 0.15, vol: 0.05 }); },
   shield() { [523, 784, 1047].forEach((f, i) => bell(f, i * 0.05, 0.06, 0.6)); },
   speed() { noise({ dur: 0.55, vol: 0.14, freq: 500, f2: 2600, q: 1.2 }); tone({ f: 220, f2: 660, dur: 0.4, vol: 0.07 }); },
+  paw() { noise({ dur: 0.5, vol: 0.13, freq: 700, f2: 3000, q: 1.1 }); bell(880, 0, 0.07, 0.4); bell(1320, 0.08, 0.07, 0.5); },
+  duck() { noise({ dur: 0.18, vol: 0.06, freq: 900, f2: 400, q: 0.8 }); },
   pad() { tone({ f: 440, f2: 990, dur: 0.18, vol: 0.1 }); noise({ dur: 0.2, vol: 0.06, freq: 1500, f2: 3500, q: 1 }); },
   fall() { tone({ f: 880, f2: 220, dur: 0.75, vol: 0.1, curve: 'lin' }); },
   respawn() { bell(660, 0, 0.06, 0.25); bell(990, 0.07, 0.06, 0.3); },

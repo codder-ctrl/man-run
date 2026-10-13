@@ -59,7 +59,7 @@ export function moveBody(b, dt, T, stepUp = PHYS.stepUp) {
     }
   } else {
     for (const s of near) {
-      if (s.kind !== 'block') continue;
+      if (s.kind !== 'block' && s.kind !== 'roof') continue;
       if (b.x + hw <= s.x || b.x - hw >= s.x + s.w) continue;
       const bottom = s.y + s.h;
       if (b.y - b.h >= bottom - 0.5 && ny - b.h < bottom) {
@@ -104,8 +104,11 @@ export function stepRunner(r, dt, T, input, topSpeed) {
   if (r.vx < topSpeed) r.vx = Math.min(topSpeed, r.vx + PHYS.accel * dt * (r.vx < 80 ? 1.6 : 1));
   else r.vx = Math.max(topSpeed, r.vx - 1400 * dt);
 
+  // Ducking: a low slide on the ground, a quick drop in the air. Nobody stands up under a roof.
+  const headroom = !roofAbove(r, T);
+  let duck = (!!input.duck && r.canJump !== false) || (r.duck && !headroom);
   let jumped = false;
-  if (r.jumpBuf > 0 && r.coyote > 0 && r.canJump !== false) {
+  if (r.jumpBuf > 0 && r.coyote > 0 && r.canJump !== false && headroom) {
     r.vy = -PHYS.jumpV;
     r.grounded = false;
     r.coyote = 0;
@@ -113,7 +116,11 @@ export function stepRunner(r, dt, T, input, topSpeed) {
     r.cut = false;
     r.jumpT = 0;
     jumped = true;
+    duck = false;
   }
+  r.duck = duck;
+  r.h = duck ? PHYS.duckH : PHYS.h;
+  if (duck && input.duck && !r.grounded && r.vy < PHYS.maxFall) r.vy += PHYS.fastFall * dt;
   r.jumpT = (r.jumpT || 0) + dt;
   if (!input.hold && r.vy < 0 && !r.cut && r.jumpT >= PHYS.minHold) {
     r.vy *= PHYS.jumpCut;
@@ -126,13 +133,25 @@ export function stepRunner(r, dt, T, input, topSpeed) {
   return res;
 }
 
+// Would standing up hit a wall block or a low roof?
+export function roofAbove(r, T) {
+  const hw = r.w / 2;
+  for (const s of solidsNear(T, r.x - hw, r.x + hw)) {
+    if (s.kind !== 'block' && s.kind !== 'roof') continue;
+    if (r.x + hw <= s.x || r.x - hw >= s.x + s.w) continue;
+    if (s.y + s.h > r.y - PHYS.h && s.y < r.y - 1) return true;
+  }
+  return false;
+}
+
 // "What happens if I keep running / jump right now?" for the bots.
 // Returns { danger, t } where danger is null, 'pit', 'wall' or 'spikes' and t the time it shows up.
-export function simulate(r, T, topSpeed, jumpNow, horizon, dt = 1 / 60) {
-  const b = { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut };
+// duck: hold the duck button the whole time (to see whether sliding gets under a roof).
+export function simulate(r, T, topSpeed, jumpNow, horizon, dt = 1 / 60, duck = false) {
+  const b = { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut, duck: r.duck };
   let airborne = false;
   for (let t = 0; t < horizon; t += dt) {
-    const res = stepRunner(b, dt, T, { jump: jumpNow && t === 0, hold: true }, topSpeed);
+    const res = stepRunner(b, dt, T, { jump: jumpNow && t === 0, hold: true, duck }, topSpeed);
     if (res.jumped) airborne = true;
     if (res.blocked) return { danger: 'wall', t, x: b.x };
     if (onSpikes(b, T)) return { danger: 'spikes', t, x: b.x };

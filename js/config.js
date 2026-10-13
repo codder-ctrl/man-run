@@ -1,7 +1,7 @@
 // Game constants: physics, animals, items. World units: y grows downward, a runner is about
 // 60 units tall, the view is VIEW_H units tall whatever the screen size.
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 
 export const VIEW_H = 430;
 export const STEP = 1 / 120; // fixed physics step (seconds)
@@ -20,6 +20,8 @@ export const PHYS = {
   buffer: 0.12, // a jump pressed this early before landing still happens
   w: 26, // runner box width
   h: 50, // runner box height
+  duckH: 28, // box height while ducking (low roofs leave 32 units)
+  fastFall: 2600, // extra pull while ducking in the air
   stepUp: 10, // ledges this low are walked up without jumping
   killY: 700, // falling this far below the lowest ground respawns the runner
   respawnDelay: 0.9,
@@ -67,5 +69,17 @@ export const BOT_SKILL = [
   { react: 0.45, slip: 0.06, itemDelay: [0.5, 2.0] },
   { react: 0.38, slip: 0.08, itemDelay: [0.6, 2.4] },
 ];
+
+// Blue paw: every animal's own dash. It charges over PAW_CHARGE seconds; the extra distance it
+// gives is about the same for everyone (short and fast or long and steady).
+export const PAW_CHARGE = 15;
+export const ABILITIES = {
+  fox: { name: 'Tilki Atılışı', speed: 560, time: 1.3, desc: 'kısa ama çok hızlı' },
+  bear: { name: 'Ayı Gücü', speed: 460, time: 2.1, desc: 'uzun ve güçlü' },
+  bunny: { name: 'Tavşan Sıçrayışı', speed: 520, time: 1.6, desc: 'çevik ve hızlı' },
+  wolf: { name: 'Kurt Koşusu', speed: 500, time: 1.8, desc: 'dengeli ve hızlı' },
+  cat: { name: 'Kedi Çevikliği', speed: 540, time: 1.5, desc: 'sessiz ve hızlı' },
+  panda: { name: 'Bambu Rüzgârı', speed: 470, time: 2.0, desc: 'uzun soluklu' },
+};
 
 export const PLACE_NAMES = ['1.', '2.', '3.', '4.'];

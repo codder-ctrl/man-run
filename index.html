@@ -27,13 +27,16 @@
         <div class="hero-stage">
           <canvas id="hero-preview" width="220" height="200"></canvas>
           <div id="hero-name" class="hero-name">Tilki</div>
+          <div id="hero-paw" class="hero-paw">🐾 Tilki Atılışı</div>
         </div>
         <div class="menu-side">
           <div class="pick-title">Karakterini seç</div>
           <div id="animal-grid" class="animal-grid"></div>
           <div id="map-row" class="map-row"></div>
-          <button id="btn-race" class="big-btn">YARIŞ!</button>
-          <button id="btn-online" class="mid-btn online-btn">👫 Arkadaşla Oyna</button>
+          <div class="race-row">
+            <button id="btn-race" class="big-btn">YARIŞ!</button>
+            <button id="btn-online" class="mid-btn online-btn">👫 Arkadaşla Oyna</button>
+          </div>
           <div class="menu-stats" id="menu-stats"></div>
         </div>
       </div>
@@ -41,6 +44,7 @@
         <button id="btn-sound" class="chip" aria-pressed="true">🔊 Ses</button>
         <button id="btn-music" class="chip" aria-pressed="true">🎵 Müzik</button>
         <button id="btn-help" class="chip">❔ Nasıl oynanır</button>
+        <button id="btn-install" class="chip install-chip hidden">📲 Telefona Yükle</button>
       </div>
     </div>
     <div id="version" class="version"></div>
@@ -61,6 +65,8 @@
     <div id="count" class="count"></div>
     <div id="touch-jump" class="touch-jump"></div>
     <button id="btn-jump" class="round-btn jump-btn" aria-label="Zıpla"><span>▲</span><small>ZIPLA</small></button>
+    <button id="btn-duck" class="round-btn duck-btn" aria-label="Eğil"><span>▼</span><small>EĞİL</small></button>
+    <button id="btn-paw" class="round-btn paw-btn" aria-label="Mavi pati"><span class="paw-fill"></span><span class="paw-icon">🐾</span></button>
     <button id="btn-item" class="round-btn item-btn empty" aria-label="Eşya kullan"><canvas id="item-icon" width="120" height="120"></canvas><small id="item-name"></small></button>
   </section>
 
@@ -102,6 +108,17 @@
     </div>
   </section>
 
+  <!-- Install guide -->
+  <section id="install" class="screen dim hidden">
+    <div class="panel">
+      <h2>Telefona Yükle</h2>
+      <p class="install-lead">Man Run'ı uygulama gibi ana ekranına ekle: simgesine dokununca tam ekran açılır, internetsiz de oynanır.</p>
+      <ol id="install-steps" class="install-steps"></ol>
+      <button id="btn-install-go" class="big-btn hidden">Yükle</button>
+      <button id="btn-install-close" class="chip">Kapat</button>
+    </div>
+  </section>
+
   <div id="toast" class="toast"></div>
 
   <!-- Pause -->
@@ -139,6 +156,8 @@
       <ul>
         <li><b>Zıpla:</b> ekranın sol tarafına dokun (bilgisayarda <kbd>Boşluk</kbd>). Basılı tutarsan daha yükseğe zıplarsın.</li>
         <li><b>Eşya:</b> sağ alttaki düğme (bilgisayarda <kbd>E</kbd>). Eşyaları <span class="qbox">?</span> kutularından alırsın.</li>
+        <li><b>Eğil:</b> <b>EĞİL</b> düğmesini basılı tut (bilgisayarda <kbd>↓</kbd>). Alçak kaya tavanlarının altından kayarak geçersin; havadayken basarsan hızla yere inersin.</li>
+        <li><b>Mavi pati:</b> 🐾 düğmesi zamanla dolar. Dolunca dokun (bilgisayarda <kbd>Q</kbd>): her hayvan kendi tarzında hızlanır.</li>
       </ul>
       <div id="help-items" class="help-items"></div>
       <p class="tip">Sarı oklar seni hızlandırır, çamur yavaşlatır, dikenler sersemletir. Çukura düşersen biraz geriden devam edersin.</p>

@@ -9,7 +9,7 @@
 //             (other runners, bots, saws, boxes, places) is copied from the host's snapshots.
 // Runner control (r.ctrl): 'local' (this phone's input), 'bot', 'remote'.
 
-import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, ANIMALS, BOT_SKILL } from './config.js';
+import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
 import { buildTrack, respawnAt, rng } from './track.js';
 import { stepRunner, moveBody, onSpikes, inStrip } from './physics.js';
 import { createBot } from './ai.js';
@@ -25,6 +25,7 @@ function makeRunner(id, animal, ctrl, name) {
     stun: 0, stunKind: null, shield: 0, boost: 0, pad: 0, invuln: 0,
     item: null, rolling: 0, dead: 0, deathX: 0, finished: false, finishTime: 0, place: id + 1,
     inMud: false, airTime: 0, runPhase: 0, slope: 0,
+    duck: false, paw: 0, dash: 0, // blue paw: charge 0..1 and dash time left
     bot: null,
   };
 }
@@ -85,7 +86,8 @@ function topSpeed(race, r) {
   if (r.finished && r.x > race.T.finishX + 420) return 0; // jog to a stop past the line
   let s = PHYS.run;
   if (r.boost > 0 || r.pad > 0) s = PHYS.boost;
-  else if (r.inMud) s = PHYS.mud;
+  else if (r.inMud && r.dash <= 0) s = PHYS.mud;
+  if (r.dash > 0) s = Math.max(s, ABILITIES[r.animal].speed);
   if (r.bot) s *= r.bot.speedMul;
   return s;
 }
@@ -96,6 +98,7 @@ export function applyHit(r, kind) {
   r.stunKind = kind;
   r.boost = 0;
   r.pad = 0;
+  r.dash = 0;
   if (kind === 'spikes') { r.vy = -520; r.vx = -140; r.grounded = false; r.invuln = 1.4; }
   else if (kind === 'saw' || kind === 'anvil') { r.vx = 0; if (r.grounded) r.vy = -260; r.grounded = false; }
   else r.vx *= 0.2;
@@ -151,6 +154,15 @@ export function useItem(race, r) {
       emit(race, 'anvilWarn', { id: leader.id });
     }
   }
+  return true;
+}
+
+// Blue paw dash. Movement belongs to the runner's own phone, so a guest uses it locally.
+export function usePaw(race, r) {
+  if (r.paw < 1 || r.dash > 0 || r.dead > 0 || r.stun > 0 || race.phase !== 'race' || r.finished) return false;
+  r.paw = 0;
+  r.dash = ABILITIES[r.animal].time;
+  emit(race, 'paw', { id: r.id });
   return true;
 }
 
@@ -210,6 +222,8 @@ function updateRunner(race, r, dt, input) {
     return;
   }
 
+  r.dash = Math.max(0, r.dash - dt);
+  if (race.phase === 'race' && !r.finished && r.dash <= 0) r.paw = Math.min(1, r.paw + dt / PAW_CHARGE);
   r.canJump = r.stun <= 0 && race.phase === 'race';
   const wasGrounded = r.grounded;
   const res = stepRunner(r, dt, T, r.canJump ? input : { jump: false, hold: false }, topSpeed(race, r));
@@ -250,6 +264,7 @@ function updateRemote(race, r, dt) {
       r.y = n.y + (n.grounded || n.dead > 0 ? 0 : n.vy * age);
       r.vx = n.vx; r.vy = n.vy; r.grounded = n.grounded; r.dead = n.dead; r.deathX = n.deathX;
       r.runPhase = n.runPhase; r.slope = n.slope; r.inMud = n.inMud;
+      r.duck = n.duck; r.h = n.duck ? PHYS.duckH : PHYS.h; r.dash = n.dash;
     }
     if (r.dead <= 0) pickupBoxes(race, r);
     checkFinish(race, r);
@@ -263,6 +278,8 @@ function updateRemote(race, r, dt) {
     if (r.lastSt === 'dead') emit(race, 'respawn', { id: r.id, remote: true });
   }
   r.lastSt = st;
+  if (r.dash > 0 && !(r.lastDash > 0)) emit(race, 'paw', { id: r.id, remote: true });
+  r.lastDash = r.dash;
 }
 
 function updateSaws(race, dt) {
@@ -363,10 +380,13 @@ export function stepRace(race, dt, input = {}) {
     if (race.phase === 'countdown') continue;
     if (r.ctrl === 'remote') { updateRemote(race, r, dt); continue; }
     let inp = { jump: false, hold: false };
-    if (r.ctrl === 'bot') inp = r.bot.think(race, dt);
-    else if (!r.finished) {
-      inp = { jump: !!input.jump, hold: !!input.hold };
+    if (r.ctrl === 'bot') {
+      inp = r.bot.think(race, dt);
+      if (inp.paw) usePaw(race, r);
+    } else if (!r.finished) {
+      inp = { jump: !!input.jump, hold: !!input.hold, duck: !!input.duck };
       if (input.item) useItem(race, r);
+      if (input.paw) usePaw(race, r);
     }
     updateRunner(race, r, dt, inp);
   }

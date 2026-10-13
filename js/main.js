@@ -1,6 +1,6 @@
 // Wires everything together: menu, race loop, input, HUD, results, sound.
 
-import { VERSION, STEP, ANIMALS, ITEMS, ITEM_IDS, PLACE_NAMES } from './config.js';
+import { VERSION, STEP, ANIMALS, ITEMS, ITEM_IDS, PLACE_NAMES, ABILITIES } from './config.js';
 import { createRace, stepRace, results } from './game.js';
 import { createRenderer } from './render.js';
 import { drawAnimal, poseFor, drawPortrait, ANIMAL } from './animals.js';
@@ -99,6 +99,7 @@ function toast(text) {
 
 function refreshMenu() {
   $('hero-name').textContent = ANIMAL[save.animal].name;
+  $('hero-paw').textContent = `🐾 ${ABILITIES[save.animal].name}: ${ABILITIES[save.animal].desc}`;
   document.querySelectorAll('.animal-card').forEach((el) => el.classList.toggle('on', el.dataset.id === save.animal));
   document.querySelectorAll('.map-chip').forEach((el) => el.classList.toggle('on', el.dataset.id === save.map));
   $('menu-stats').textContent = save.races ? `${save.races} yarış · ${save.wins} birincilik` : '';
@@ -271,6 +272,11 @@ function updateHud(t) {
     el.classList.add('pop');
     lastPlace = p.place;
   }
+  // Blue paw button: fills up, glows when ready.
+  const pb = $('btn-paw');
+  pb.style.setProperty('--fill', p.dash > 0 ? 1 : p.paw.toFixed(3));
+  pb.classList.toggle('ready', p.paw >= 1 && p.dash <= 0);
+  pb.classList.toggle('active', p.dash > 0);
   // Item button roulette, and keeping the button honest (online the host owns items).
   if (p.rolling <= 0 && (p.item || null) !== shownItem) setItem(p.item || null);
   if (p.rolling > 0) {
@@ -347,6 +353,7 @@ function handleEvent(e) {
     case 'sawBreak': if (near) sfx('sawBreak'); break;
     case 'trap': if (me || near) sfx('trap'); break;
     case 'pad': if (me) sfx('pad'); break;
+    case 'paw': if (me || near) sfx('paw'); break;
     case 'fall': if (me) sfx('fall'); break;
     case 'respawn': if (me) sfx('respawn'); break;
     case 'finish':
@@ -421,7 +428,20 @@ function resume() {
 
 // ---- Input ----
 
-const input = { jumpQueued: false, hold: false, itemQueued: false };
+const input = { jumpQueued: false, hold: false, itemQueued: false, duck: false, pawQueued: false };
+const ducks = new Set();
+function duckDown(src) {
+  initAudio();
+  if (!ducks.size) sfx('duck');
+  ducks.add(src);
+  input.duck = true;
+  $('btn-duck').classList.add('down');
+}
+function duckUp(src) {
+  ducks.delete(src);
+  input.duck = ducks.size > 0;
+  if (!input.duck) $('btn-duck').classList.remove('down');
+}
 const held = new Set();
 function jumpDown(src) {
   initAudio();
@@ -438,16 +458,23 @@ function jumpUp(src) {
 
 const JUMP_KEYS = new Set(['Space', 'ArrowUp', 'KeyW']);
 const ITEM_KEYS = new Set(['KeyE', 'Enter', 'ArrowRight', 'KeyD']);
+const DUCK_KEYS = new Set(['ArrowDown', 'KeyS']);
+const PAW_KEYS = new Set(['KeyQ', 'ShiftLeft', 'ShiftRight']);
 window.addEventListener('keydown', (e) => {
   if (mode === 'race') {
     if (JUMP_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) jumpDown('k' + e.code); }
     else if (ITEM_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.itemQueued = true; }
+    else if (DUCK_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) duckDown('k' + e.code); }
+    else if (PAW_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.pawQueued = true; }
     else if (e.code === 'Escape' || e.code === 'KeyP') pause();
   } else if (mode === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
   else if (mode === 'menu' && (e.code === 'Space' || e.code === 'Enter') && !e.target.closest?.('input') && $('online').classList.contains('hidden')) { e.preventDefault(); startRace(); }
   else if (mode === 'results' && (e.code === 'Space' || e.code === 'Enter') && online.role !== 'guest') { e.preventDefault(); startRace(); }
 });
-window.addEventListener('keyup', (e) => { if (JUMP_KEYS.has(e.code)) jumpUp('k' + e.code); });
+window.addEventListener('keyup', (e) => {
+  if (JUMP_KEYS.has(e.code)) jumpUp('k' + e.code);
+  if (DUCK_KEYS.has(e.code)) duckUp('k' + e.code);
+});
 
 for (const id of ['touch-jump', 'btn-jump']) {
   const el = $(id);
@@ -461,7 +488,17 @@ for (const id of ['touch-jump', 'btn-jump']) {
   el.addEventListener('lostpointercapture', (e) => jumpUp('p' + e.pointerId));
 }
 $('btn-item').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.itemQueued = true; });
-window.addEventListener('blur', () => { held.clear(); input.hold = false; if (!sync) pause(); });
+$('btn-paw').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.pawQueued = true; });
+{
+  const el = $('btn-duck');
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    duckDown('p' + e.pointerId);
+    try { el.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, (e) => duckUp('p' + e.pointerId));
+}
+window.addEventListener('blur', () => { held.clear(); ducks.clear(); input.hold = false; input.duck = false; if (!sync) pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && !sync) pause(); });
 
 $('btn-race').addEventListener('click', startRace);
@@ -686,9 +723,10 @@ function frame(now, fromRaf) {
       const n = Math.max(1, Math.ceil(dt / STEP - 0.01));
       const sdt = dt / n;
       for (let i = 0; i < n && mode === 'race'; i++) {
-        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued };
+        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duck, paw: input.pawQueued };
         input.jumpQueued = false;
         input.itemQueued = false;
+        input.pawQueued = false;
         stepRace(race, sdt, inp);
         for (const e of race.events) { if (sync && sync.event) sync.event(e); handleEvent(e); }
         race.events.length = 0;
@@ -713,14 +751,107 @@ if ('serviceWorker' in navigator && location.hostname !== 'localhost' && locatio
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
+// ---- Installing to the phone ----
+// Android Chrome/Edge/Samsung offer a one-tap install prompt (beforeinstallprompt); iPhones and
+// in-app browsers (Instagram, Telegram...) don't, so the guide explains the menu steps instead.
+
+let installPrompt = null;
+const installed = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+function refreshInstall() { show('btn-install', !installed()); }
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  refreshInstall();
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  show('install', false);
+  refreshInstall();
+  toast('Yüklendi! Ana ekranında Man Run simgesi var.');
+});
+
+function installSteps() {
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const inApp = /Instagram|FBAN|FBAV|FB_IAB|Line\/|Telegram|Snapchat|musical_ly|BytedanceWebview|; wv\)/.test(ua);
+  const samsung = /SamsungBrowser/.test(ua);
+  const android = /Android/.test(ua);
+  if (inApp) {
+    return [
+      'Bu sayfa bir uygulamanın içinde açılmış; buradan yüklenemiyor.',
+      `Sağ üstteki <b>⋮</b> ya da <b>…</b> menüsünden <b>${ios ? "Safari'de aç" : "Chrome'da aç"}</b>'ı seç.`,
+      'Açılan tarayıcıda bu menüye tekrar gel ve <b>📲 Telefona Yükle</b>\'ye dokun.',
+    ];
+  }
+  if (ios) {
+    return [
+      'Ekranın altındaki (iPad\'de üstündeki) <b>Paylaş</b> düğmesine dokun: içinden yukarı ok çıkan kare ⬆️.',
+      'Listeyi biraz kaydır ve <b>Ana Ekrana Ekle</b>\'yi seç.',
+      'Sağ üstteki <b>Ekle</b>\'ye dokun. Man Run simgesi ana ekranına gelir.',
+    ];
+  }
+  if (samsung) {
+    return [
+      'Alttaki <b>≡</b> menü düğmesine dokun.',
+      '<b>Sayfayı ekle</b> → <b>Ana ekran</b>\'ı seç.',
+      '<b>Ekle</b>\'ye dokun.',
+    ];
+  }
+  if (android) {
+    return [
+      "Chrome'da sağ üstteki <b>⋮</b> menüsüne dokun.",
+      '<b>Uygulamayı yükle</b> ya da <b>Ana ekrana ekle</b>\'yi seç.',
+      '<b>Yükle</b>\'ye dokun. Man Run simgesi ana ekranına gelir.',
+    ];
+  }
+  return [
+    "Chrome ya da Edge'de adres çubuğunun sağındaki <b>yükle</b> simgesine (⊕ ya da 🖥️) tıkla.",
+    'Ya da tarayıcı menüsünden <b>Man Run\'ı yükle</b>\'yi seç.',
+  ];
+}
+
+function openInstall() {
+  initAudio();
+  sfx('click');
+  const list = $('install-steps');
+  list.innerHTML = '';
+  if (installPrompt) {
+    show('btn-install-go', true);
+    const li = document.createElement('li');
+    li.innerHTML = 'Aşağıdaki <b>Yükle</b> düğmesine dokun, çıkan pencerede de <b>Yükle</b>\'yi seç.';
+    list.appendChild(li);
+  } else {
+    show('btn-install-go', false);
+    for (const step of installSteps()) {
+      const li = document.createElement('li');
+      li.innerHTML = step;
+      list.appendChild(li);
+    }
+  }
+  show('install', true);
+}
+
+$('btn-install').addEventListener('click', openInstall);
+$('btn-install-close').addEventListener('click', () => { sfx('click'); show('install', false); });
+$('btn-install-go').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  const p = installPrompt;
+  installPrompt = null;
+  p.prompt();
+  const choice = await p.userChoice.catch(() => null);
+  if (!choice || choice.outcome !== 'accepted') openInstall();
+});
+refreshInstall();
+
 // Test hook on localhost.
 if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
   // advance(s): run the race s seconds synchronously (hidden panes throttle animation frames).
   const advance = (sec) => {
     for (let i = 0; i < sec / STEP && race && mode === 'race'; i++) {
-      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued });
+      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duck, paw: input.pawQueued });
       input.jumpQueued = false;
       input.itemQueued = false;
+      input.pawQueued = false;
       for (const e of race.events) handleEvent(e);
       race.events.length = 0;
       if (i % 2 === 0) renderer.draw(STEP * 2, performance.now() / 1000 + i * STEP);

@@ -16,7 +16,7 @@ const cos = Math.cos;
 export function poseFor(r, t) {
   const p = {
     legF: 0, legB: 0, kneeF: 0, kneeB: 0, armF: 0, armB: 0, lean: 0, bob: 0, sq: 1,
-    head: 0, blink: 0, mouth: 0, look: 0.4, tail: 0, scarf: 0, dizzy: 0, zap: 0, caught: 0, cheer: 0,
+    head: 0, blink: 0, mouth: 0, look: 0.4, tail: 0, scarf: 0, dizzy: 0, zap: 0, caught: 0, cheer: 0, slide: 0,
   };
   const blinkT = (t * 0.7 + r.id * 0.31) % 3.1;
   p.blink = blinkT < 0.12 ? 1 - Math.abs(blinkT - 0.06) / 0.06 : 0;
@@ -54,6 +54,22 @@ export function poseFor(r, t) {
     p.cheer = 1;
     p.bob = -j * 10; p.armF = -2.7 + sin(t * 14) * 0.2; p.armB = -2.5 - sin(t * 14) * 0.2;
     p.legF = 0.25 * j; p.legB = -0.25 * j; p.mouth = 1; p.tail = sin(t * 14) * 0.5;
+    return p;
+  }
+
+  if (r.duck) {
+    if (r.grounded) {
+      // Baseball slide: lying back, feet first, arms trailing.
+      p.slide = 1;
+      p.legF = -1.25; p.kneeF = 0.15; p.legB = -0.95; p.kneeB = 0.45;
+      p.armF = -2.3 + Math.sin(t * 20) * 0.1; p.armB = -2.6; p.elbF = 0.3; p.elbB = 0.3;
+      p.mouth = 1; p.look = 0.7; p.tail = -0.6; p.head = 0.35; p.scarf = 1;
+    } else {
+      // Tucked into a ball, dropping fast.
+      p.legF = -1.5; p.kneeF = 2.3; p.legB = -1.1; p.kneeB = 2.2;
+      p.armF = -0.7; p.armB = -0.4; p.elbF = 1.7; p.elbB = 1.6;
+      p.bob = -4; p.mouth = 2; p.sq = 0.92; p.tail = -0.5;
+    }
     return p;
   }
 
@@ -125,6 +141,11 @@ export function drawAnimal(ctx, id, p, t = 0) {
 
   ctx.save();
   ctx.translate(0, p.bob);
+  if (p.slide) {
+    // Lie back around the feet so the whole body fits under a low roof.
+    ctx.translate(16 * p.slide, -7 * p.slide);
+    ctx.rotate(-0.88 * p.slide);
+  }
 
   // Limbs are stroked polylines (outline, fill, highlight) so bent joints stay seamless.
   const limbStroke = (pts, r, color) => {
