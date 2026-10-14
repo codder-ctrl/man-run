@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.4.0**. Yerelde hazır: **v0.5.0** (tırmanma, zıplama/kayma cezası, tek dokunuşla kayma, kişiye özel kutular, README; "yükle" bekleniyor).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.5.0** (tırmanma, zıplama/kayma cezası, tek dokunuşla kayma, kişiye özel kutular, README). Kullanıcının telefonda denemesi ve puanı bekleniyor.
 
 ## Proje
 
