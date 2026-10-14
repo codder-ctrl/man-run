@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.6.0**. Yerelde hazır: **v0.7.0** (360° nişan, bas-bekle-bırak eşyalar, daha yüksek hız; "yükle" bekleniyor). v0.6 için puan verilmedi.
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.7.0** (360° nişan, bas-bekle-bırak eşyalar, daha yüksek hız). v0.6 için puan verilmedi; kullanıcının telefonda denemesi bekleniyor.
 
 ## Proje
 
