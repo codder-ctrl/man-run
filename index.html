@@ -67,7 +67,7 @@
     <button id="btn-jump" class="round-btn jump-btn" aria-label="Zıpla"><span>▲</span><small>ZIPLA</small></button>
     <button id="btn-duck" class="round-btn duck-btn" aria-label="Eğil"><span>▼</span><small>EĞİL</small></button>
     <button id="btn-paw" class="round-btn paw-btn" aria-label="Mavi pati: basılı tut, kaydırarak nişan al, bırak"><span class="paw-fill"></span><span class="paw-icon">🐾</span><span id="paw-knob" class="paw-knob"></span><small class="paw-hint">Basılı tut</small></button>
-    <button id="btn-item" class="round-btn item-btn empty" aria-label="Eşya kullan"><canvas id="item-icon" width="120" height="120"></canvas><small id="item-name"></small></button>
+    <button id="btn-item" class="round-btn item-btn empty" aria-label="Eşya kullan"><canvas id="item-icon" width="120" height="120"></canvas><span id="item-knob" class="paw-knob"></span><small id="item-name"></small></button>
   </section>
 
   <!-- Online: host or join -->
@@ -155,10 +155,10 @@
       <p>Karakterin kendi koşar. Sen sadece <b>zıplar</b> ve <b>eşya kullanırsın</b>. Bitiş bayrağına ilk varan kazanır!</p>
       <ul>
         <li><b>Zıpla:</b> ekranın sol tarafına dokun (bilgisayarda <kbd>Boşluk</kbd>). Basılı tutarsan daha yükseğe zıplarsın.</li>
-        <li><b>Eşya:</b> sağ alttaki düğme (bilgisayarda <kbd>E</kbd>). Eşyaları <span class="qbox">?</span> kutularından alırsın.</li>
+        <li><b>Eşya:</b> sağ alttaki düğmeye <b>basılı tut, bırakınca</b> kullanılır (bilgisayarda <kbd>E</kbd>). <b>Testere</b> ve <b>Kapan</b>'ı basılı tutarken parmağını kaydırarak her yöne nişan alabilirsin; ekranında ok ve gideceği yol çıkar. Eşyaları <span class="qbox">?</span> kutularından alırsın.</li>
         <li><b>Eğil:</b> <b>EĞİL</b>'e bir kez dokun (bilgisayarda <kbd>↓</kbd>): kısa bir süre kayarsın, sonra kendin kalkarsın. Alçak kaya tavanlarının altından böyle geçilir; havadayken dokunursan hızla yere iner, kayarak devam edersin.</li>
         <li><b>Tırman:</b> Duvara çarparsan tutunup tırmanırsın; tırmanırken zıplamayı basılı tutarsan daha hızlı çıkarsın. Kenarı az farkla kaçırırsan da kenara tutunursun.</li>
-        <li><b>Mavi pati:</b> 🐾 düğmesi zamanla dolar. Dolunca <b>basılı tut ve parmağını kaydır</b>: ekranında bir ok ve gideceğin yol çıkar. Bırakınca o yöne atılırsın; yukarı atarak duvarların ve çukurların üstünden geçebilirsin. Kısa dokunuş düz ileri atar. (Bilgisayarda <kbd>Q</kbd>'yu basılı tut, <kbd>↑</kbd>/<kbd>↓</kbd> ile nişan al, bırak.)</li>
+        <li><b>Mavi pati:</b> 🐾 düğmesi zamanla dolar. Dolunca <b>basılı tut ve parmağını kaydır</b>: ekranında bir ok ve gideceğin yol çıkar. Bırakınca o yöne atılırsın (her yöne, geriye bile); yukarı atarak duvarların ve çukurların üstünden geçebilirsin. Kısa dokunuş düz ileri atar. (Bilgisayarda <kbd>Q</kbd>'yu basılı tut, <kbd>↑</kbd>/<kbd>↓</kbd> ile nişan al, bırak.)</li>
       </ul>
       <div id="help-items" class="help-items"></div>
       <p class="tip">Sarı oklar seni hızlandırır, çamur yavaşlatır, dikenler sersemletir. Zıplarken ve kayarken biraz yavaşlarsın, gereksiz zıplama! Çukura düşersen biraz geriden devam edersin.</p>

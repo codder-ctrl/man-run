@@ -1,6 +1,6 @@
 // Wires everything together: menu, race loop, input, HUD, results, sound.
 
-import { VERSION, STEP, ANIMALS, ITEMS, ITEM_IDS, PLACE_NAMES, ABILITIES } from './config.js';
+import { VERSION, STEP, ANIMALS, ITEMS, ITEM_IDS, PLACE_NAMES, ABILITIES, AIMED_ITEMS } from './config.js';
 import { createRace, stepRace, results } from './game.js';
 import { createRenderer } from './render.js';
 import { drawAnimal, poseFor, drawPortrait, ANIMAL } from './animals.js';
@@ -10,7 +10,7 @@ import { THEMES, THEME_IDS } from './themes.js';
 import { createOnline } from './online.js';
 import { createHostSync, createGuestSync } from './netsync.js';
 import { cleanCode } from './net.js';
-import { clampAim } from './physics.js';
+import { normAngle } from './physics.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('scene');
@@ -431,19 +431,28 @@ function resume() {
 
 // ---- Input ----
 
-const input = { jumpQueued: false, hold: false, itemQueued: false, duckQueued: false, pawQueued: false, pawAngle: 0 };
+const input = { jumpQueued: false, hold: false, itemQueued: false, itemAngle: null, duckQueued: false, pawQueued: false, pawAngle: 0 };
 
-// ---- Aiming the blue paw (Brawl Stars style) ----
-// Hold 🐾 and drag: the direction from where you pressed to your finger is the aim (only this
-// screen shows the arrow; everyone sees the paw pointing). Let go to fire; a tap fires forward.
-// Keyboard: hold Q, aim with ↑/↓, let go.
-const aim = { on: false, angle: 0, src: null, x0: 0, y0: 0, keyDir: 0 };
+// ---- Aiming (Brawl Stars style): the blue paw and the items ----
+// Hold 🐾 or the item button: nothing happens until you let go. For the paw, a saw or a trap, drag
+// to aim all the way round: the direction from where you pressed to your finger. Only this screen
+// shows the arrow and path; everyone sees the animal point (or hold the item up). Let go to use;
+// a tap uses the plain way (paw forward, saw rolling forward, trap dropped behind). Keyboard:
+// hold Q (paw) or E (item), turn the aim with ↑/↓, let go.
+const aim = { on: false, kind: null, item: null, aimed: false, moved: false, angle: 0, src: null, x0: 0, y0: 0, keyDir: 0 };
+const AIM_BTN = { paw: 'btn-paw', item: 'btn-item' };
+const AIM_KNOB = { paw: 'paw-knob', item: 'item-knob' };
 const pawReady = () => race && mode === 'race' && race.phase === 'race' && race.player.paw >= 1 && race.player.dash <= 0 && race.player.dead <= 0 && !race.player.finished;
-function setKnob(x, y) { $('paw-knob').style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; }
-function aimStart(src, x, y) {
-  if (aim.on || !pawReady()) return false;
-  Object.assign(aim, { on: true, src, x0: x, y0: y, angle: 0, keyDir: 0 });
-  $('btn-paw').classList.add('aiming');
+const itemReady = () => race && mode === 'race' && race.phase === 'race' && !!race.player.item && race.player.rolling <= 0 && race.player.dead <= 0 && !race.player.finished;
+function setKnob(x, y) { if (aim.kind) $(AIM_KNOB[aim.kind]).style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; }
+// The default aim before any drag: where the plain use would go.
+const defaultAngle = () => (aim.kind === 'item' && aim.item === 'trap' ? Math.PI : 0);
+function aimStart(kind, src, x, y) {
+  if (aim.on || !(kind === 'paw' ? pawReady() : itemReady())) return false;
+  const item = kind === 'item' ? race.player.item : null;
+  Object.assign(aim, { on: true, kind, item, aimed: kind === 'paw' || AIMED_ITEMS.has(item), moved: false, src, x0: x, y0: y, keyDir: 0 });
+  aim.angle = defaultAngle();
+  $(AIM_BTN[kind]).classList.add('aiming');
   setKnob(0, 0);
   sfx('aim');
   return true;
@@ -452,21 +461,31 @@ function aimMove(x, y) {
   const dx = x - aim.x0;
   const dy = y - aim.y0;
   const d = Math.hypot(dx, dy);
+  if (!aim.aimed) return; // lightning, anvil, shield, speed: just hold and let go
   const k = d > 30 ? 30 / d : 1;
   setKnob(dx * k, dy * k);
-  if (d > 10) aim.angle = clampAim(Math.atan2(-dy, dx));
+  if (d > 10) { aim.angle = normAngle(Math.atan2(-dy, dx)); aim.moved = true; }
 }
 function aimEnd(fire) {
   if (!aim.on) return;
-  aim.on = false;
-  aim.src = null;
-  aim.keyDir = 0;
-  $('btn-paw').classList.remove('aiming');
+  const { kind, angle, moved } = aim;
   setKnob(0, 0);
-  if (fire) {
+  $(AIM_BTN[kind]).classList.remove('aiming');
+  Object.assign(aim, { on: false, kind: null, item: null, src: null, keyDir: 0 });
+  if (!fire) return;
+  if (kind === 'paw') {
     input.pawQueued = true;
-    input.pawAngle = aim.angle;
+    input.pawAngle = moved ? angle : 0;
+  } else {
+    input.itemQueued = true;
+    input.itemAngle = moved ? angle : null;
   }
+}
+// What the runner shows while a button is held: the aim, or the item held up for the rest.
+function aimInput() {
+  if (!aim.on) return { aim: null, aimKind: null };
+  const kind = aim.kind === 'paw' ? 'paw' : aim.item;
+  return { aim: aim.aimed ? aim.angle : Math.PI / 2, aimKind: kind, aimPlain: aim.aimed && !aim.moved };
 }
 // EĞİL is a tap, like jumping: one press slides for a moment (or dives in the air).
 function duckPress() {
@@ -502,16 +521,16 @@ window.addEventListener('keydown', (e) => {
   }
   if (mode === 'race') {
     if (JUMP_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) jumpDown('k' + e.code); }
-    else if (ITEM_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.itemQueued = true; }
+    else if (ITEM_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) aimStart('item', 'k', 0, 0); }
     else if (DUCK_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) duckPress(); }
-    else if (PAW_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) aimStart('k', 0, 0); }
+    else if (PAW_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) aimStart('paw', 'k', 0, 0); }
     else if (e.code === 'Escape' || e.code === 'KeyP') pause();
   } else if (mode === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
   else if (mode === 'menu' && (e.code === 'Space' || e.code === 'Enter') && !e.target.closest?.('input') && $('online').classList.contains('hidden')) { e.preventDefault(); startRace(); }
   else if (mode === 'results' && (e.code === 'Space' || e.code === 'Enter') && online.role !== 'guest') { e.preventDefault(); startRace(); }
 });
 window.addEventListener('keyup', (e) => {
-  if (aim.src === 'k' && PAW_KEYS.has(e.code)) aimEnd(true);
+  if (aim.src === 'k' && ((aim.kind === 'paw' && PAW_KEYS.has(e.code)) || (aim.kind === 'item' && ITEM_KEYS.has(e.code)))) aimEnd(true);
   if (aim.src === 'k' && ['ArrowUp', 'KeyW', 'ArrowDown', 'KeyS'].includes(e.code)) aim.keyDir = 0;
   if (JUMP_KEYS.has(e.code)) jumpUp('k' + e.code);
 });
@@ -527,19 +546,18 @@ for (const id of ['touch-jump', 'btn-jump']) {
   el.addEventListener('pointercancel', (e) => jumpUp('p' + e.pointerId));
   el.addEventListener('lostpointercapture', (e) => jumpUp('p' + e.pointerId));
 }
-$('btn-item').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.itemQueued = true; });
-{
-  const pawBtn = $('btn-paw');
-  pawBtn.addEventListener('pointerdown', (e) => {
+for (const kind of ['paw', 'item']) {
+  const btn = $(AIM_BTN[kind]);
+  btn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     initAudio();
-    if (aimStart('p' + e.pointerId, e.clientX, e.clientY)) {
-      try { pawBtn.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+    if (aimStart(kind, 'p' + e.pointerId, e.clientX, e.clientY)) {
+      try { btn.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
     }
   });
-  pawBtn.addEventListener('pointermove', (e) => { if (aim.src === 'p' + e.pointerId) aimMove(e.clientX, e.clientY); });
-  pawBtn.addEventListener('pointerup', (e) => { if (aim.src === 'p' + e.pointerId) aimEnd(true); });
-  pawBtn.addEventListener('pointercancel', (e) => { if (aim.src === 'p' + e.pointerId) aimEnd(false); });
+  btn.addEventListener('pointermove', (e) => { if (aim.src === 'p' + e.pointerId) aimMove(e.clientX, e.clientY); });
+  btn.addEventListener('pointerup', (e) => { if (aim.src === 'p' + e.pointerId) aimEnd(true); });
+  btn.addEventListener('pointercancel', (e) => { if (aim.src === 'p' + e.pointerId) aimEnd(false); });
 }
 $('btn-duck').addEventListener('pointerdown', (e) => { e.preventDefault(); duckPress(); });
 window.addEventListener('blur', () => { held.clear(); input.hold = false; if (!sync) pause(); });
@@ -767,14 +785,14 @@ function frame(now, fromRaf) {
       const n = Math.max(1, Math.ceil(dt / STEP - 0.01));
       const sdt = dt / n;
       if (aim.on) {
-        if (!pawReady()) aimEnd(false);
-        else if (aim.src === 'k') {
-          if (aim.keyDir) aim.angle = clampAim(aim.angle + aim.keyDir * dt * 2.2);
+        if (!(aim.kind === 'paw' ? pawReady() : itemReady())) aimEnd(false);
+        else if (aim.src === 'k' && aim.aimed) {
+          if (aim.keyDir) { aim.angle = normAngle(aim.angle + aim.keyDir * dt * 2.6); aim.moved = true; }
           setKnob(Math.cos(aim.angle) * 22, -Math.sin(aim.angle) * 22);
         }
       }
       for (let i = 0; i < n && mode === 'race'; i++) {
-        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued, pawAngle: input.pawAngle, aim: aim.on ? aim.angle : null };
+        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, itemAngle: input.itemAngle, duck: input.duckQueued, paw: input.pawQueued, pawAngle: input.pawAngle, ...aimInput() };
         input.jumpQueued = false;
         input.duckQueued = false;
         input.itemQueued = false;
@@ -900,7 +918,7 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
   // advance(s): run the race s seconds synchronously (hidden panes throttle animation frames).
   const advance = (sec) => {
     for (let i = 0; i < sec / STEP && race && mode === 'race'; i++) {
-      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued, pawAngle: input.pawAngle, aim: aim.on ? aim.angle : null });
+      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, itemAngle: input.itemAngle, duck: input.duckQueued, paw: input.pawQueued, pawAngle: input.pawAngle, ...aimInput() });
       input.jumpQueued = false;
       input.duckQueued = false;
       input.itemQueued = false;

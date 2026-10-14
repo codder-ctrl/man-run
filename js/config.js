@@ -1,9 +1,9 @@
 // Game constants: physics, animals, items. World units: y grows downward, a runner is about
 // 60 units tall, the view is VIEW_H units tall whatever the screen size.
 
-export const VERSION = '0.6.0';
+export const VERSION = '0.7.0';
 
-export const VIEW_H = 430;
+export const VIEW_H = 450; // a little wider than before: runners are faster now
 export const STEP = 1 / 120; // fixed physics step (seconds)
 
 export const PHYS = {
@@ -12,10 +12,10 @@ export const PHYS = {
   jumpCut: 0.6, // releasing early multiplies the rising speed by this...
   minHold: 0.12, // ...but not before this long, so a quick tap still clears a wall
   maxFall: 1100,
-  run: 300, // top running speed
-  accel: 700, // speed gained per second while below top speed
-  boost: 470, // top speed while boosted (Hız item, speed pads)
-  mud: 165, // top speed in mud
+  run: 340, // top running speed (raised from 300 in v0.7: the user wanted more speed)
+  accel: 800, // speed gained per second while below top speed
+  boost: 530, // top speed while boosted (Hız item, speed pads)
+  mud: 190, // top speed in mud
   coyote: 0.09, // still allowed to jump this long after leaving a ledge
   buffer: 0.12, // a jump pressed this early before landing still happens
   w: 26, // runner box width
@@ -25,7 +25,7 @@ export const PHYS = {
   fastFall: 2600, // extra pull while diving (EĞİL pressed in the air)
   moveSlow: 0.8, // top speed multiplier while in the air after a jump and while sliding
   airDecel: 600, // how fast the speed drops to that in the air (on the ground: 1400)
-  climb: 240, // climbing speed up a wall (doubled while jump is held)
+  climb: 270, // climbing speed up a wall (doubled while jump is held)
   climbReach: 120, // walls whose top is at most this far above the feet can be climbed
   stepUp: 10, // ledges this low are walked up without jumping
   killY: 700, // falling this far below the lowest ground respawns the runner
@@ -65,7 +65,8 @@ export const SHIELD_TIME = 6;
 export const SPEED_TIME = 3;
 export const PAD_TIME = 1.4;
 export const BOX_RESPAWN = 4;
-export const SAW_SPEED = 760;
+export const SAW_SPEED = 840;
+export const TRAP_THROW = 520; // how hard an aimed trap is thrown
 export const SAW_LIFE = 3.2;
 
 // Bots: reaction chance per decision tick and how far ahead they look.
@@ -79,20 +80,20 @@ export const BOT_SKILL = [
 // gives is about the same for everyone (short and fast or long and steady).
 export const PAW_CHARGE = 15;
 export const ABILITIES = {
-  fox: { name: 'Tilki Atılışı', speed: 560, time: 1.3, desc: 'kısa ama çok hızlı' },
-  bear: { name: 'Ayı Gücü', speed: 460, time: 2.1, desc: 'uzun ve güçlü' },
-  bunny: { name: 'Tavşan Sıçrayışı', speed: 520, time: 1.6, desc: 'çevik ve hızlı' },
-  wolf: { name: 'Kurt Koşusu', speed: 500, time: 1.8, desc: 'dengeli ve hızlı' },
-  cat: { name: 'Kedi Çevikliği', speed: 540, time: 1.5, desc: 'sessiz ve hızlı' },
-  panda: { name: 'Bambu Rüzgârı', speed: 470, time: 2.0, desc: 'uzun soluklu' },
+  fox: { name: 'Tilki Atılışı', speed: 630, time: 1.3, desc: 'kısa ama çok hızlı' },
+  bear: { name: 'Ayı Gücü', speed: 520, time: 2.1, desc: 'uzun ve güçlü' },
+  bunny: { name: 'Tavşan Sıçrayışı', speed: 585, time: 1.6, desc: 'çevik ve hızlı' },
+  wolf: { name: 'Kurt Koşusu', speed: 565, time: 1.8, desc: 'dengeli ve hızlı' },
+  cat: { name: 'Kedi Çevikliği', speed: 610, time: 1.5, desc: 'sessiz ve hızlı' },
+  panda: { name: 'Bambu Rüzgârı', speed: 530, time: 2.0, desc: 'uzun soluklu' },
 };
 
-// Aimed blue paw: hold the 🐾 button and drag to aim, release to fire. The runner bursts that way
-// for PAW_BURST seconds at its ability speed × PAW_BURST_MUL with gravity off, then the usual dash
-// boost carries on. Angles: 0 forward, +π/2 straight up, negative down-forward.
+// Aimed blue paw: hold the 🐾 button and drag to aim (all the way round), release to fire. The
+// runner bursts that way for PAW_BURST seconds at its ability speed × PAW_BURST_MUL with gravity
+// off, then the usual dash boost carries on. Angles: 0 forward, +π/2 up, ±π backward, -π/2 down.
 export const PAW_BURST = 0.22;
 export const PAW_BURST_MUL = 1.2;
-export const AIM_MIN = -1.2;
-export const AIM_MAX = Math.PI / 2;
+// Items that can be aimed the same way (the rest are used when the button is let go).
+export const AIMED_ITEMS = new Set(['saw', 'trap']);
 
 export const PLACE_NAMES = ['1.', '2.', '3.', '4.'];

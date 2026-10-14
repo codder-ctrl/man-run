@@ -128,13 +128,17 @@ export function createBot(r, skill, R) {
     let use = false;
     switch (r.item) {
       case 'shield': use = threat || itemAge > 4; break;
-      case 'saw': use = (aheadNear && r.grounded) || itemAge > 5; break;
+      case 'saw': use = ((aheadNear || behindNear) && r.grounded) || itemAge > 5; break;
       case 'trap': use = (behindNear && r.grounded) || (itemAge > 4 && r.grounded); break;
       case 'anvil': use = r.place > 1 || itemAge > 3; break;
       case 'speed': use = r.grounded; break;
       default: use = true;
     }
-    if (use) race.useItem(r);
+    if (!use) return;
+    // Saws roll at whoever is near: forward if someone is ahead, else back at the chaser.
+    let angle = null;
+    if (r.item === 'saw' && !aheadNear && behindNear) angle = Math.PI;
+    race.useItem(r, angle);
   }
 
   return bot;

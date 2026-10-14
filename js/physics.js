@@ -3,7 +3,7 @@
 //
 // body: { x (center), y (feet), vx, vy, w, h, grounded, ... }
 
-import { PHYS, PAW_BURST, PAW_BURST_MUL, AIM_MIN, AIM_MAX } from './config.js';
+import { PHYS, PAW_BURST, PAW_BURST_MUL } from './config.js';
 import { solidsNear, floorBelow, surfaceAt, slopeAt } from './track.js';
 
 // Moves the body by its velocity for dt seconds and resolves collisions. Ground strips have
@@ -91,12 +91,14 @@ export function inStrip(list, b) {
   return null;
 }
 
-export const clampAim = (a) => Math.max(AIM_MIN, Math.min(AIM_MAX, a));
+// Angles wrap all the way round, into (-π, π].
+export const normAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 // Starts an aimed blue-paw burst at `speed` (the animal's ability speed) toward `angle`.
 export function startBurst(r, angle, speed) {
-  let a = clampAim(angle || 0);
-  if (r.grounded && a < 0) a = 0; // can't dash into the ground
+  let a = normAngle(angle || 0);
+  // On the ground a downward aim can't go into the earth: it becomes flat forward or backward.
+  if (r.grounded && Math.sin(a) < 0) a = Math.cos(a) >= 0 ? 0 : Math.PI;
   const v = speed * PAW_BURST_MUL;
   r.burst = { t: PAW_BURST, vx: Math.cos(a) * v, vy: -Math.sin(a) * v, a };
   if (r.burst.vy < 0) r.grounded = false;

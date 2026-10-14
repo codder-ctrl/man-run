@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.6.0** (nişanlı mavi pati). Kullanıcının telefonda denemesi ve puanı bekleniyor.
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.6.0**. Yerelde hazır: **v0.7.0** (360° nişan, bas-bekle-bırak eşyalar, daha yüksek hız; "yükle" bekleniyor). v0.6 için puan verilmedi.
 
 ## Proje
 
@@ -167,6 +167,21 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.6.0** (nişanlı mavi pati). K
   - Kısa dokunuş düz ileri atar.
 - **Klavye:** Q'yu basılı tut, ↑/↓ ile nişan al, bırak.
 - **Botlar:** Kısa bir süre görünür şekilde nişan alıp en uzağa götüren güvenli açıyı seçiyorlar (çoğunlukla ileri, bazen yukarı).
+
+## v0.7.0'da olanlar (kullanıcının istekleri)
+
+- **Her şey 360°:** Mavi pati her yöne (geriye bile) atılabiliyor. Yerdeyken aşağı nişan düz ileriye ya da geriye döner.
+- **Eşyalar bas, bekle, bırak:** Hiçbir eşya basınca hemen kullanılmıyor, bırakınca kullanılıyor.
+  - **Testere ve Kapan nişan alınıyor:** Kişiye özel ok ve noktalı rota (testere kırmızı, kapan turuncu) gösteriliyor. Herkes karakterin elinde eşyayı ve kolun yönünü görüyor.
+  - **Testere:** Nişan yönüne uçar, yere değince o yöne yuvarlanır. Geriye atılırsa arkadakini vurur.
+  - **Kapan:** Fırlatılırsa düştüğü yerde kurulur. Kendi kapanın seni hiç yakalamaz.
+  - **Kısa dokunuş:** Testere ileri yuvarlanır, kapan arkaya düşer.
+  - **Yönsüzler (Şimşek, Örs, Kalkan, Hız):** Basılı tutarken karakter eşyayı başının üstüne kaldırır, sadece oyuncunun ekranında "BIRAK!" yazar; bırakınca kullanılır.
+- **Genel hız yaklaşık %13 arttı:**
+  - Koşu 300 → 340, hız eşyası/oklar 470 → 530, çamur 165 → 190.
+  - Pati yetenekleri, testere ve tırmanma da hızlandı.
+  - Kamera biraz uzaklaştı (görüş 430 → 450), pist 15000 → 16500 uzadı.
+  - Yarışlar şimdi yaklaşık 45-58 saniye.
 
 ## Öğrenilenler
 

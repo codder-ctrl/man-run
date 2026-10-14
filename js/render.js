@@ -1,12 +1,13 @@
 // Draws the race: camera, layered world, runners, items and effects. Turns race events into
 // effects (dust, shards, bolts, shake, hit-stop).
 
-import { VIEW_H, ABILITIES, AIM_MIN, AIM_MAX } from './config.js';
+import { VIEW_H, ABILITIES, AIMED_ITEMS, ITEMS } from './config.js';
+import { predictItemPath } from './game.js';
 import { floorBelow } from './track.js';
 import { predictBurst } from './physics.js';
 import { drawAnimal, poseFor, drawTrap, ANIMAL } from './animals.js';
 import { createBackdrop, createTerrain, createForeground, createWeather, drawMud, drawPad, drawBox, drawDeco, drawFinish, LIVE_DECO, THEMES } from './scenery.js';
-import { createFx, drawSaw, drawAnvil } from './fx.js';
+import { createFx, drawSaw, drawAnvil, drawItemIcon } from './fx.js';
 import { blob, line, flat, glow, shadow, circle, ellipse, roundRect, poly, INK, rgba, tint } from './paint.js';
 
 export function createRenderer(canvas) {
@@ -307,22 +308,36 @@ export function createRenderer(canvas) {
       ctx.restore();
       if (Math.random() < 0.6) fx.speedLine(r.x - 34 - Math.random() * 24, r.y - 8 - Math.random() * 44);
     }
-    // Aiming the blue paw: a glowing orb in the raised paw (everyone sees where it points).
+    // Aiming: everyone sees the raised paw pointing the way, with a glowing orb (blue paw) or the
+    // item in it (saw, trap... or held up high for the items that aren't aimed).
     if (typeof r.aim === 'number' && r.stun <= 0 && r.dead <= 0 && !r.climb) {
       const hx = r.x + 2 + Math.cos(r.aim) * 15;
       const hy = r.y - 29 - Math.sin(r.aim) * 15;
       const pulse = 1 + Math.sin(t * 14) * 0.15;
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      glow(ctx, hx, hy, 22 * pulse, '#4aa8ff', 0.75);
-      glow(ctx, r.x, r.y - 26, 40, '#4aa8ff', 0.25);
-      ctx.restore();
-      flat(ctx, circle(hx, hy, 5 * pulse), '#e8f6ff');
-      for (let i = 0; i < 3; i++) {
-        const a = t * 6 + (i * Math.PI * 2) / 3;
-        flat(ctx, circle(hx + Math.cos(a) * 9, hy + Math.sin(a) * 9, 1.6), '#bfe4ff', 0.9);
+      if (!r.aimKind || r.aimKind === 'paw') {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        glow(ctx, hx, hy, 22 * pulse, '#4aa8ff', 0.75);
+        glow(ctx, r.x, r.y - 26, 40, '#4aa8ff', 0.25);
+        ctx.restore();
+        flat(ctx, circle(hx, hy, 5 * pulse), '#e8f6ff');
+        for (let i = 0; i < 3; i++) {
+          const a = t * 6 + (i * Math.PI * 2) / 3;
+          flat(ctx, circle(hx + Math.cos(a) * 9, hy + Math.sin(a) * 9, 1.6), '#bfe4ff', 0.9);
+        }
+        if (Math.random() < dt * 20) fx.sparks(hx, hy, '#8fd0ff', 1, 0.3);
+      } else {
+        const color = (ITEMS[r.aimKind] || {}).color || '#ffd23f';
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        glow(ctx, hx, hy - 4, 24 * pulse, color, 0.55);
+        ctx.restore();
+        ctx.save();
+        ctx.translate(hx, hy - 4);
+        ctx.scale(0.42 * pulse, 0.42 * pulse);
+        drawItemIcon(ctx, r.aimKind, t);
+        ctx.restore();
       }
-      if (Math.random() < dt * 20) fx.sparks(hx, hy, '#8fd0ff', 1, 0.3);
     }
     // A blue streak along the burst.
     if (r.burst) {
@@ -393,29 +408,42 @@ export function createRenderer(canvas) {
     ctx.fillText(label, r.x, ly + 0.5);
   }
 
-  // The private aim guide: a range arc, the predicted path as dots, and a pulsing arrow.
+  // The private aim guide (only on the aiming phone): a faint ring, the predicted path as dots and a
+  // pulsing arrow, in blue for the paw and in the item's color for a saw or trap. Items that
+  // aren't aimed just show a pulsing ring and "BIRAK!" (let go).
   function drawAimGuide(r, t) {
     const cx = r.x;
     const cy = r.y - 30;
-    const speed = ABILITIES[r.animal].speed;
-    // Range the paw can be aimed in.
+    const kind = r.aimKind || 'paw';
+    if (kind !== 'paw' && !AIMED_ITEMS.has(kind)) {
+      const k = (t * 1.5) % 1;
+      ctx.globalAlpha = 1 - k;
+      line(ctx, circle(cx, cy, 30 + k * 30), (ITEMS[kind] || {}).color || '#ffd23f', 4);
+      ctx.globalAlpha = 1;
+      ctx.font = '16px "Lilita One", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = INK;
+      ctx.strokeText('BIRAK!', cx, r.y - 104);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('BIRAK!', cx, r.y - 104);
+      return;
+    }
+    const color = kind === 'paw' ? '#4aa8ff' : kind === 'saw' ? '#ef4b3f' : '#f29a2e';
+    const dot = kind === 'paw' ? '#bfe4ff' : kind === 'saw' ? '#ff8a7a' : '#ffc070';
+    // The aim can go all the way round.
     ctx.save();
-    ctx.globalAlpha = 0.35;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 58, -AIM_MAX, -AIM_MIN);
-    ctx.lineWidth = 7;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineCap = 'round';
-    ctx.stroke();
+    ctx.globalAlpha = 0.3;
+    line(ctx, circle(cx, cy, 58), '#ffffff', 5);
     ctx.restore();
-    // Where the burst would take you.
-    const pts = predictBurst(r, race.T, r.aim, speed);
+    // Where it would go.
+    const pts = kind === 'paw' ? predictBurst(r, race.T, r.aim, ABILITIES[r.animal].speed) : predictItemPath(race, r, kind, r.aimPlain ? null : r.aim);
     for (let i = 1; i < pts.length; i++) {
       const k = i / pts.length;
       const [x, y] = pts[i];
-      const rad = 4.2 - k * 2;
-      ctx.globalAlpha = 0.95 - k * 0.6;
-      blob(ctx, circle(x, y, rad), '#bfe4ff', { ow: 1.4, ink: '#1d4f8a', depth: 0, shade: false, light: false });
+      const rad = 5 - k * 2.2;
+      ctx.globalAlpha = 1 - k * 0.55;
+      blob(ctx, circle(x, y, rad), dot, { ow: 1.8, ink: INK, depth: 0, shade: false, light: false });
     }
     ctx.globalAlpha = 1;
     // The arrow itself, breathing a little.
@@ -426,9 +454,9 @@ export function createRenderer(canvas) {
     ctx.rotate(-r.aim);
     const shaft = (c) => { c.moveTo(start, -5); c.lineTo(len - 18, -5); c.lineTo(len - 18, -13); c.lineTo(len, 0); c.lineTo(len - 18, 13); c.lineTo(len - 18, 5); c.lineTo(start, 5); c.closePath(); };
     ctx.globalCompositeOperation = 'lighter';
-    glow(ctx, len - 12, 0, 26, '#4aa8ff', 0.5);
+    glow(ctx, len - 12, 0, 26, color, 0.5);
     ctx.globalCompositeOperation = 'source-over';
-    blob(ctx, shaft, '#4aa8ff', { ow: 2.4, depth: 2.5, shade: '#2a6fd0', light: '#bfe4ff' });
+    blob(ctx, shaft, color, { ow: 2.4, depth: 2.5, light: dot });
     // A light running along the arrow shows it's live.
     const ph = (t * 1.8) % 1;
     flat(ctx, circle(start + (len - start - 14) * ph, 0, 3), '#ffffff', 1 - ph);

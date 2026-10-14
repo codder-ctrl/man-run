@@ -9,7 +9,7 @@
 //             (other runners, bots, saws, boxes, places) is copied from the host's snapshots.
 // Runner control (r.ctrl): 'local' (this phone's input), 'bot', 'remote'.
 
-import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
+import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, TRAP_THROW, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
 import { buildTrack, respawnAt, rng } from './track.js';
 import { stepRunner, moveBody, onSpikes, inStrip, startBurst } from './physics.js';
 import { createBot } from './ai.js';
@@ -26,7 +26,8 @@ function makeRunner(id, animal, ctrl, name) {
     item: null, rolling: 0, dead: 0, deathX: 0, finished: false, finishTime: 0, place: id + 1,
     inMud: false, airTime: 0, runPhase: 0, slope: 0,
     duck: false, paw: 0, dash: 0, // blue paw: charge 0..1 and dash time left
-    aim: null, // aiming angle while the blue paw button is held (everyone sees the pose)
+    aim: null, // aiming angle while the blue paw or an item button is held (everyone sees the pose)
+    aimKind: null, // what is being aimed: 'paw' or an item id
     bot: null,
   };
 }
@@ -36,7 +37,7 @@ function makeRunner(id, animal, ctrl, name) {
 export function createRace(opts = {}) {
   const seed = opts.seed ?? (Math.random() * 1e9) >>> 0;
   const theme = opts.theme || 'forest';
-  const T = buildTrack(seed, { length: opts.length ?? 15000, theme });
+  const T = buildTrack(seed, { length: opts.length ?? 16500, theme });
   const R = rng(seed ^ 0x9e3779b9);
   let roster = opts.roster;
   if (!roster) {
@@ -67,7 +68,7 @@ export function createRace(opts = {}) {
   };
   race.humans = runners.filter((r) => r.ctrl !== 'bot');
   runners.forEach((r) => { if (r.ctrl === 'bot') r.bot = createBot(r, BOT_SKILL[(r.id + 2) % 3], R); });
-  race.useItem = (r) => useItem(race, r);
+  race.useItem = (r, angle = null) => useItem(race, r, angle);
   return race;
 }
 
@@ -128,11 +129,26 @@ function rollItem(race, r) {
   return 'shield';
 }
 
-export function useItem(race, r) {
+// Thrown items. angle: the aim (0 forward, π/2 up, ±π back) or null for the plain use: a saw
+// rolls forward, a trap drops right behind. An aimed saw flies off that way and rolls on along
+// the ground once it lands (backward too); an aimed trap is lobbed and arms where it lands.
+function makeSaw(race, r, angle) {
+  const a = angle ?? 0;
+  const dir = Math.cos(a) >= 0 ? 1 : -1;
+  const push = dir > 0 ? Math.max(0, r.vx) : 0;
+  const speed = SAW_SPEED + push;
+  return { id: race.nextId++, x: r.x + 26 * Math.cos(a), y: r.y - 2 - Math.max(0, Math.sin(a)) * 20, vx: Math.cos(a) * speed, vy: -Math.sin(a) * speed * 0.85, speed, dir, rollOn: angle === null || angle === undefined || Math.abs(Math.sin(a)) < 0.2, w: 22, h: 22, grounded: false, owner: r.id, life: SAW_LIFE, spin: 0 };
+}
+function makeTrap(race, r, angle) {
+  if (angle === null || angle === undefined) return { id: race.nextId++, x: r.x - 30, y: r.y, vx: 0, vy: 0, w: 30, h: 10, grounded: false, owner: r.id, armed: 0.4, snap: 0, victim: -1 };
+  return { id: race.nextId++, x: r.x, y: r.y - 30, vx: Math.cos(angle) * TRAP_THROW + Math.max(0, r.vx) * 0.5, vy: -Math.sin(angle) * TRAP_THROW - 140, w: 30, h: 10, grounded: false, owner: r.id, armed: 0.4, snap: 0, victim: -1, thrown: true };
+}
+
+export function useItem(race, r, angle = null) {
   if (!r.item || r.rolling > 0 || r.dead > 0 || race.phase !== 'race') return false;
   if (race.role === 'guest') {
     // The host decides what the item does; it answers through its snapshots and events.
-    race.outbox.push({ t: 'use' });
+    race.outbox.push({ t: 'use', a: typeof angle === 'number' ? Math.round(angle * 100) / 100 : null });
     r.item = null;
     r.usedAt = race.time;
     return true;
@@ -146,9 +162,9 @@ export function useItem(race, r) {
     for (const o of race.runners) if (o !== r) hit(race, o, 'lightning', r);
     emit(race, 'lightning', { id: r.id });
   } else if (item === 'saw') {
-    race.saws.push({ id: race.nextId++, x: r.x + 26, y: r.y - 2, vx: SAW_SPEED + Math.max(0, r.vx), speed: SAW_SPEED + Math.max(0, r.vx), vy: 0, w: 22, h: 22, grounded: r.grounded, owner: r.id, life: SAW_LIFE, spin: 0 });
+    race.saws.push(makeSaw(race, r, angle));
   } else if (item === 'trap') {
-    race.traps.push({ id: race.nextId++, x: r.x - 30, y: r.y, vy: 0, w: 30, h: 10, grounded: false, owner: r.id, armed: 0.4, snap: 0, victim: -1 });
+    race.traps.push(makeTrap(race, r, angle));
   } else if (item === 'anvil') {
     const leader = race.order.find((o) => o !== r && !o.finished && o.dead <= 0);
     if (leader) {
@@ -279,6 +295,7 @@ function updateRemote(race, r, dt) {
       r.runPhase = n.runPhase; r.slope = n.slope; r.inMud = n.inMud;
       r.duck = n.duck; r.h = n.duck ? PHYS.duckH : PHYS.h; r.dash = n.dash; r.climb = n.climb ? { top: r.y } : null;
       r.aim = n.aim ?? null;
+      r.aimKind = r.aim === null ? null : n.aimKind || 'paw';
     }
     if (r.dead <= 0) pickupBoxes(race, r);
     checkFinish(race, r);
@@ -301,16 +318,7 @@ function updateSaws(race, dt) {
   const T = race.T;
   for (const s of race.saws) {
     s.life -= dt;
-    s.spin += dt * 30;
-    s.vy = Math.min(PHYS.maxFall, s.vy + PHYS.gravity * dt);
-    const res = moveBody(s, dt, T, 14);
-    if (res.blocked) {
-      // Hops over walls and steps (gives up after a while).
-      s.vx = s.speed;
-      if (s.grounded) s.vy = -680;
-      s.hops = (s.hops || 0) + 1;
-      if (s.hops > 40) s.life = 0;
-    }
+    stepSaw(s, dt, T);
     if (s.y > T.lowest + 400) s.life = 0;
     for (const r of race.runners) {
       if (r.id === s.owner || r.dead > 0 || r.finished || s.life <= 0) continue;
@@ -324,20 +332,59 @@ function updateSaws(race, dt) {
   race.saws = race.saws.filter((s) => s.life > 0);
 }
 
+// One step of a saw: flies under gravity, rolls along the ground once it lands (in the direction
+// it was thrown), hops over walls. Shared with the aim preview.
+export function stepSaw(s, dt, T) {
+  s.spin += dt * 30 * (s.dir || 1);
+  s.vy = Math.min(PHYS.maxFall, s.vy + PHYS.gravity * dt);
+  const wasGrounded = s.grounded;
+  const res = moveBody(s, dt, T, 14);
+  if (s.grounded && (!wasGrounded || s.rollOn)) { s.vx = (s.dir || 1) * s.speed; s.rollOn = true; }
+  if (res.blocked || (s.dir < 0 && s.vx === 0 && s.grounded)) {
+    // Hops over walls and steps (gives up after a while).
+    s.vx = (s.dir || 1) * s.speed;
+    if (s.grounded) s.vy = -680;
+    s.hops = (s.hops || 0) + 1;
+    if (s.hops > 40) s.life = 0;
+  }
+  return res;
+}
+
+// One step of a thrown trap: flies until it lands, then stays put.
+export function stepTrap(t, dt, T) {
+  if (t.grounded) return;
+  t.vy = Math.min(PHYS.maxFall, t.vy + PHYS.gravity * dt);
+  moveBody(t, dt, T, 0);
+  if (t.grounded) t.vx = 0;
+}
+
+// The path an aimed saw or trap would take (the aiming player's private preview).
+export function predictItemPath(race, r, item, angle, seconds = 0.9, dt = 1 / 60, every = 3) {
+  const o = item === 'saw' ? makeSaw({ nextId: 0 }, r, angle) : makeTrap({ nextId: 0 }, r, angle);
+  const pts = [[o.x, o.y - (item === 'saw' ? 11 : 4)]];
+  let i = 0;
+  for (let t = 0; t < seconds; t += dt) {
+    if (item === 'saw') stepSaw(o, dt, race.T);
+    else { stepTrap(o, dt, race.T); if (o.grounded) { pts.push([o.x, o.y - 4]); break; } }
+    if (++i % every === 0) pts.push([o.x, o.y - (item === 'saw' ? 11 : 4)]);
+    if (o.y > race.T.lowest + 300) break;
+  }
+  return pts;
+}
+
 function updateTraps(race, dt) {
   const T = race.T;
   for (const t of race.traps) {
     t.armed = Math.max(0, t.armed - dt);
     if (!t.grounded) {
-      t.vy = Math.min(PHYS.maxFall, t.vy + PHYS.gravity * dt);
-      t.vx = 0;
-      moveBody(t, dt, T, 0);
+      stepTrap(t, dt, T);
       if (t.y > T.lowest + 400) t.gone = true;
+      if (t.thrown && !t.grounded) continue; // in flight: harmless until it lands
     }
     if (t.snap > 0) { t.snap += dt; if (t.snap > 1.6) t.gone = true; continue; }
     for (const r of race.runners) {
       if (r.dead > 0 || r.finished) continue;
-      if (r.id === t.owner && t.armed > 0) continue;
+      if (r.id === t.owner) continue; // your own trap never catches you
       if (Math.abs(r.x - t.x) < 22 && Math.abs(r.y - t.y) < 14) {
         t.snap = 0.001;
         t.victim = r.id;
@@ -398,13 +445,16 @@ export function stepRace(race, dt, input = {}) {
     if (r.ctrl === 'bot') {
       inp = r.bot.think(race, dt);
       r.aim = inp.aim ?? null;
+      r.aimKind = r.aim === null ? null : inp.aimKind || 'paw';
       if (inp.paw) usePaw(race, r, inp.pawAngle);
     } else if (!r.finished) {
       inp = { jump: !!input.jump, hold: !!input.hold, duck: !!input.duck };
       r.aim = input.aim ?? null;
-      if (input.item) useItem(race, r);
+      r.aimKind = r.aim === null ? null : input.aimKind || 'paw';
+      r.aimPlain = !!input.aimPlain; // aiming but not dragged yet: the plain use would happen
+      if (input.item) useItem(race, r, input.itemAngle ?? null);
       if (input.paw) usePaw(race, r, input.pawAngle);
-    } else r.aim = null;
+    } else { r.aim = null; r.aimKind = null; }
     updateRunner(race, r, dt, inp);
   }
   if (guest) {
