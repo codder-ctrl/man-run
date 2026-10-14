@@ -11,7 +11,7 @@
 
 import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
 import { buildTrack, respawnAt, rng } from './track.js';
-import { stepRunner, moveBody, onSpikes, inStrip } from './physics.js';
+import { stepRunner, moveBody, onSpikes, inStrip, startBurst } from './physics.js';
 import { createBot } from './ai.js';
 
 export const COUNTDOWN = 3;
@@ -26,6 +26,7 @@ function makeRunner(id, animal, ctrl, name) {
     item: null, rolling: 0, dead: 0, deathX: 0, finished: false, finishTime: 0, place: id + 1,
     inMud: false, airTime: 0, runPhase: 0, slope: 0,
     duck: false, paw: 0, dash: 0, // blue paw: charge 0..1 and dash time left
+    aim: null, // aiming angle while the blue paw button is held (everyone sees the pose)
     bot: null,
   };
 }
@@ -99,6 +100,7 @@ export function applyHit(r, kind) {
   r.boost = 0;
   r.pad = 0;
   r.dash = 0;
+  r.burst = null;
   if (kind === 'spikes') { r.vy = -520; r.vx = -140; r.grounded = false; r.invuln = 1.4; }
   else if (kind === 'saw' || kind === 'anvil') { r.vx = 0; if (r.grounded) r.vy = -260; r.grounded = false; }
   else r.vx *= 0.2;
@@ -157,12 +159,15 @@ export function useItem(race, r) {
   return true;
 }
 
-// Blue paw dash. Movement belongs to the runner's own phone, so a guest uses it locally.
-export function usePaw(race, r) {
+// Blue paw: a burst toward the aimed angle (0 = forward), then the dash boost. Movement belongs to
+// the runner's own phone, so a guest uses it locally.
+export function usePaw(race, r, angle = 0) {
   if (r.paw < 1 || r.dash > 0 || r.dead > 0 || r.stun > 0 || race.phase !== 'race' || r.finished) return false;
   r.paw = 0;
   r.dash = ABILITIES[r.animal].time;
-  emit(race, 'paw', { id: r.id });
+  r.aim = null;
+  startBurst(r, angle, ABILITIES[r.animal].speed);
+  emit(race, 'paw', { id: r.id, angle: r.burst.a });
   return true;
 }
 
@@ -273,6 +278,7 @@ function updateRemote(race, r, dt) {
       r.vx = n.vx; r.vy = n.vy; r.grounded = n.grounded; r.dead = n.dead; r.deathX = n.deathX;
       r.runPhase = n.runPhase; r.slope = n.slope; r.inMud = n.inMud;
       r.duck = n.duck; r.h = n.duck ? PHYS.duckH : PHYS.h; r.dash = n.dash; r.climb = n.climb ? { top: r.y } : null;
+      r.aim = n.aim ?? null;
     }
     if (r.dead <= 0) pickupBoxes(race, r);
     checkFinish(race, r);
@@ -391,12 +397,14 @@ export function stepRace(race, dt, input = {}) {
     let inp = { jump: false, hold: false };
     if (r.ctrl === 'bot') {
       inp = r.bot.think(race, dt);
-      if (inp.paw) usePaw(race, r);
+      r.aim = inp.aim ?? null;
+      if (inp.paw) usePaw(race, r, inp.pawAngle);
     } else if (!r.finished) {
       inp = { jump: !!input.jump, hold: !!input.hold, duck: !!input.duck };
+      r.aim = input.aim ?? null;
       if (input.item) useItem(race, r);
-      if (input.paw) usePaw(race, r);
-    }
+      if (input.paw) usePaw(race, r, input.pawAngle);
+    } else r.aim = null;
     updateRunner(race, r, dt, inp);
   }
   if (guest) {

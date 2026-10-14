@@ -5,6 +5,9 @@
 import { PHYS, ABILITIES } from './config.js';
 import { simulate } from './physics.js';
 
+// Blue paw angles a bot considers: forward, low, mid and steep up.
+const PAW_ANGLES = [0, 0.35, 0.7, 1.05];
+
 const TICK = 1 / 30;
 
 export function createBot(r, skill, R) {
@@ -17,6 +20,8 @@ export function createBot(r, skill, R) {
   let itemWait = 0;
   let itemAge = 0;
   let pawWait = 1 + R() * 3;
+  let aimT = 0; // aiming (everyone sees the pose) before firing
+  let aimAngle = 0;
 
   const bot = {
     speedMul: 1,
@@ -34,18 +39,43 @@ export function createBot(r, skill, R) {
         acc = 0;
         decide(race);
       }
-      // Blue paw: once charged, after a short random wait, on the ground.
+      // Blue paw: once charged and after a short random wait, aim for a moment, then fire at the
+      // angle that gets furthest without landing in a pit or on spikes.
       let paw = false;
-      if (r.paw >= 1) {
-        pawWait -= dt;
-        if (pawWait <= 0 && r.grounded && r.stun <= 0) { paw = true; pawWait = 0.5 + R() * 3; }
+      let aim = null;
+      if (r.paw >= 1 && r.dash <= 0 && race.phase === 'race') {
+        if (aimT > 0) {
+          aimT -= dt;
+          aim = aimAngle;
+          if (aimT <= 0) paw = true;
+        } else {
+          pawWait -= dt;
+          if (pawWait <= 0 && r.grounded && r.stun <= 0 && !r.climb) {
+            aimAngle = bestAngle(race);
+            aimT = 0.3 + R() * 0.35;
+            pawWait = 0.5 + R() * 3;
+          }
+        }
       }
-      const out = { jump: pressJump, hold: holdT > 0 || r.vy < -60 || !!r.climb, duck: pressDuck, paw };
+      const out = { jump: pressJump, hold: holdT > 0 || r.vy < -60 || !!r.climb, duck: pressDuck, paw, pawAngle: aimAngle, aim };
       pressJump = false;
       pressDuck = false;
       return out;
     },
   };
+
+  function bestAngle(race) {
+    const speed = ABILITIES[r.animal].speed;
+    let best = 0;
+    let bestX = -Infinity;
+    for (const a of PAW_ANGLES) {
+      const sim = simulate(r, race.T, speed * bot.speedMul, false, 1.1, 1 / 30, false, { angle: a, speed });
+      if (sim.danger === 'pit' || sim.danger === 'spikes') continue;
+      const x = sim.x + (R() - 0.5) * 30; // a little personality
+      if (x > bestX) { bestX = x; best = a; }
+    }
+    return best;
+  }
 
   function rubberBand(race) {
     // Far ahead of the humans: ease off a little. Far behind them: push a little.
@@ -58,7 +88,7 @@ export function createBot(r, skill, R) {
   }
 
   function decide(race) {
-    if (r.dead > 0 || r.stun > 0 || r.climb || !r.grounded && r.coyote <= 0) return;
+    if (r.dead > 0 || r.stun > 0 || r.climb || r.burst || !r.grounded && r.coyote <= 0) return;
     if (race.phase !== 'race') return;
     const T = race.T;
     let top = (r.boost > 0 || r.pad > 0 ? PHYS.boost : r.inMud && r.dash <= 0 ? PHYS.mud : PHYS.run) * bot.speedMul;

@@ -10,6 +10,7 @@ import { THEMES, THEME_IDS } from './themes.js';
 import { createOnline } from './online.js';
 import { createHostSync, createGuestSync } from './netsync.js';
 import { cleanCode } from './net.js';
+import { clampAim } from './physics.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('scene');
@@ -430,7 +431,43 @@ function resume() {
 
 // ---- Input ----
 
-const input = { jumpQueued: false, hold: false, itemQueued: false, duckQueued: false, pawQueued: false };
+const input = { jumpQueued: false, hold: false, itemQueued: false, duckQueued: false, pawQueued: false, pawAngle: 0 };
+
+// ---- Aiming the blue paw (Brawl Stars style) ----
+// Hold 🐾 and drag: the direction from where you pressed to your finger is the aim (only this
+// screen shows the arrow; everyone sees the paw pointing). Let go to fire; a tap fires forward.
+// Keyboard: hold Q, aim with ↑/↓, let go.
+const aim = { on: false, angle: 0, src: null, x0: 0, y0: 0, keyDir: 0 };
+const pawReady = () => race && mode === 'race' && race.phase === 'race' && race.player.paw >= 1 && race.player.dash <= 0 && race.player.dead <= 0 && !race.player.finished;
+function setKnob(x, y) { $('paw-knob').style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; }
+function aimStart(src, x, y) {
+  if (aim.on || !pawReady()) return false;
+  Object.assign(aim, { on: true, src, x0: x, y0: y, angle: 0, keyDir: 0 });
+  $('btn-paw').classList.add('aiming');
+  setKnob(0, 0);
+  sfx('aim');
+  return true;
+}
+function aimMove(x, y) {
+  const dx = x - aim.x0;
+  const dy = y - aim.y0;
+  const d = Math.hypot(dx, dy);
+  const k = d > 30 ? 30 / d : 1;
+  setKnob(dx * k, dy * k);
+  if (d > 10) aim.angle = clampAim(Math.atan2(-dy, dx));
+}
+function aimEnd(fire) {
+  if (!aim.on) return;
+  aim.on = false;
+  aim.src = null;
+  aim.keyDir = 0;
+  $('btn-paw').classList.remove('aiming');
+  setKnob(0, 0);
+  if (fire) {
+    input.pawQueued = true;
+    input.pawAngle = aim.angle;
+  }
+}
 // EĞİL is a tap, like jumping: one press slides for a moment (or dives in the air).
 function duckPress() {
   initAudio();
@@ -458,17 +495,24 @@ const ITEM_KEYS = new Set(['KeyE', 'Enter', 'ArrowRight', 'KeyD']);
 const DUCK_KEYS = new Set(['ArrowDown', 'KeyS']);
 const PAW_KEYS = new Set(['KeyQ', 'ShiftLeft', 'ShiftRight']);
 window.addEventListener('keydown', (e) => {
+  if (mode === 'race' && aim.on && aim.src === 'k' && (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'ArrowDown' || e.code === 'KeyS')) {
+    e.preventDefault();
+    aim.keyDir = e.code === 'ArrowUp' || e.code === 'KeyW' ? 1 : -1;
+    return;
+  }
   if (mode === 'race') {
     if (JUMP_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) jumpDown('k' + e.code); }
     else if (ITEM_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.itemQueued = true; }
     else if (DUCK_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) duckPress(); }
-    else if (PAW_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.pawQueued = true; }
+    else if (PAW_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) aimStart('k', 0, 0); }
     else if (e.code === 'Escape' || e.code === 'KeyP') pause();
   } else if (mode === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
   else if (mode === 'menu' && (e.code === 'Space' || e.code === 'Enter') && !e.target.closest?.('input') && $('online').classList.contains('hidden')) { e.preventDefault(); startRace(); }
   else if (mode === 'results' && (e.code === 'Space' || e.code === 'Enter') && online.role !== 'guest') { e.preventDefault(); startRace(); }
 });
 window.addEventListener('keyup', (e) => {
+  if (aim.src === 'k' && PAW_KEYS.has(e.code)) aimEnd(true);
+  if (aim.src === 'k' && ['ArrowUp', 'KeyW', 'ArrowDown', 'KeyS'].includes(e.code)) aim.keyDir = 0;
   if (JUMP_KEYS.has(e.code)) jumpUp('k' + e.code);
 });
 
@@ -484,7 +528,19 @@ for (const id of ['touch-jump', 'btn-jump']) {
   el.addEventListener('lostpointercapture', (e) => jumpUp('p' + e.pointerId));
 }
 $('btn-item').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.itemQueued = true; });
-$('btn-paw').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.pawQueued = true; });
+{
+  const pawBtn = $('btn-paw');
+  pawBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    initAudio();
+    if (aimStart('p' + e.pointerId, e.clientX, e.clientY)) {
+      try { pawBtn.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+    }
+  });
+  pawBtn.addEventListener('pointermove', (e) => { if (aim.src === 'p' + e.pointerId) aimMove(e.clientX, e.clientY); });
+  pawBtn.addEventListener('pointerup', (e) => { if (aim.src === 'p' + e.pointerId) aimEnd(true); });
+  pawBtn.addEventListener('pointercancel', (e) => { if (aim.src === 'p' + e.pointerId) aimEnd(false); });
+}
 $('btn-duck').addEventListener('pointerdown', (e) => { e.preventDefault(); duckPress(); });
 window.addEventListener('blur', () => { held.clear(); input.hold = false; if (!sync) pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && !sync) pause(); });
@@ -710,8 +766,15 @@ function frame(now, fromRaf) {
       // Split the frame into equal sub-steps no longer than STEP: smooth on any refresh rate.
       const n = Math.max(1, Math.ceil(dt / STEP - 0.01));
       const sdt = dt / n;
+      if (aim.on) {
+        if (!pawReady()) aimEnd(false);
+        else if (aim.src === 'k') {
+          if (aim.keyDir) aim.angle = clampAim(aim.angle + aim.keyDir * dt * 2.2);
+          setKnob(Math.cos(aim.angle) * 22, -Math.sin(aim.angle) * 22);
+        }
+      }
       for (let i = 0; i < n && mode === 'race'; i++) {
-        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued };
+        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued, pawAngle: input.pawAngle, aim: aim.on ? aim.angle : null };
         input.jumpQueued = false;
         input.duckQueued = false;
         input.itemQueued = false;
@@ -837,7 +900,7 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
   // advance(s): run the race s seconds synchronously (hidden panes throttle animation frames).
   const advance = (sec) => {
     for (let i = 0; i < sec / STEP && race && mode === 'race'; i++) {
-      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued });
+      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued, pawAngle: input.pawAngle, aim: aim.on ? aim.angle : null });
       input.jumpQueued = false;
       input.duckQueued = false;
       input.itemQueued = false;
@@ -864,5 +927,5 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     };
     ch.port2.postMessage(0);
   };
-  window.manrun = { get race() { return race; }, get mode() { return mode; }, get online() { return online; }, startRace, renderer, input, advance, pump, stopPump: () => { pumping = false; }, useItem: (id) => { race.player.item = id; race.player.rolling = 0; input.itemQueued = true; } };
+  window.manrun = { get race() { return race; }, get mode() { return mode; }, get online() { return online; }, aim, aimStart, aimMove, aimEnd, startRace, renderer, input, advance, pump, stopPump: () => { pumping = false; }, useItem: (id) => { race.player.item = id; race.player.rolling = 0; input.itemQueued = true; } };
 }

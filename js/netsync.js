@@ -39,7 +39,7 @@ export function createHostSync(race, peers, send) {
         r2(r.stun), STUNS.indexOf(r.stunKind), r1(r.shield), r1(r.boost), r1(r.pad), r1(r.invuln),
         r.item ? ITEM_IDS.indexOf(r.item) : -1, r2(r.rolling), r2(r.dead), r1(r.deathX),
         r.finished ? 1 : 0, r2(r.finishTime), r.place, r2(r.runPhase || 0), r2(r.slope || 0), r.inMud ? 1 : 0,
-        r.duck ? 1 : 0, r2(r.dash), r.climb ? 1 : 0,
+        r.duck ? 1 : 0, r2(r.dash), r.climb ? 1 : 0, r.aim === null || r.aim === undefined ? null : r2(r.aim),
       ]),
       sw: race.saws.map((s) => [s.id, r1(s.x), r1(s.y), Math.round(s.vx), s.grounded ? 1 : 0]),
       tr: race.traps.map((t) => [t.id, r1(t.x), r1(t.y), r2(t.snap)]),
@@ -60,7 +60,7 @@ export function createHostSync(race, peers, send) {
       if (r.ctrl !== 'remote') return;
       lastHeard.set(peerId, race.time);
       if (msg.t === 'st') {
-        r.net = { at: race.time, x: msg.x, y: msg.y, vx: msg.vx, vy: msg.vy, grounded: !!msg.g, dead: msg.d, deathX: msg.dx, runPhase: msg.rp, slope: msg.sl, inMud: !!msg.m, duck: !!msg.k, dash: msg.ds || 0, climb: !!msg.c };
+        r.net = { at: race.time, x: msg.x, y: msg.y, vx: msg.vx, vy: msg.vy, grounded: !!msg.g, dead: msg.d, deathX: msg.dx, runPhase: msg.rp, slope: msg.sl, inMud: !!msg.m, duck: !!msg.k, dash: msg.ds || 0, climb: !!msg.c, aim: typeof msg.am === 'number' ? msg.am : null };
         if (msg.sk === 'spikes' && r.stunKind !== 'spikes' && r.stun <= 0) { r.stun = msg.st; r.stunKind = 'spikes'; r.invuln = 1.4; }
       } else if (msg.t === 'use') {
         race.useItem(r);
@@ -200,6 +200,7 @@ export function createGuestSync(race, send) {
       r.h = r.duck ? 28 : 50;
       r.dash = B[22];
       r.climb = B[23] ? { top: r.y } : null;
+      r.aim = typeof B[24] === 'number' ? B[24] : null;
     }
   }
 
@@ -216,7 +217,7 @@ export function createGuestSync(race, send) {
       reportT += dt;
       if (reportT >= REPORT_EVERY && race.phase !== 'countdown') {
         reportT = 0;
-        send({ t: 'st', x: r1(me.x), y: r1(me.y), vx: Math.round(me.vx), vy: Math.round(me.vy), g: me.grounded ? 1 : 0, d: r2(me.dead), dx: r1(me.deathX), rp: r2(me.runPhase || 0), sl: r2(me.slope || 0), m: me.inMud ? 1 : 0, sk: me.stunKind, st: r2(me.stun), k: me.duck ? 1 : 0, ds: r2(me.dash), c: me.climb ? 1 : 0 });
+        send({ t: 'st', x: r1(me.x), y: r1(me.y), vx: Math.round(me.vx), vy: Math.round(me.vy), g: me.grounded ? 1 : 0, d: r2(me.dead), dx: r1(me.deathX), rp: r2(me.runPhase || 0), sl: r2(me.slope || 0), m: me.inMud ? 1 : 0, sk: me.stunKind, st: r2(me.stun), k: me.duck ? 1 : 0, ds: r2(me.dash), c: me.climb ? 1 : 0, am: me.aim === null || me.aim === undefined ? null : r2(me.aim) });
       }
     },
   };

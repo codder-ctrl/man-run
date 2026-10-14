@@ -3,7 +3,7 @@
 //
 // body: { x (center), y (feet), vx, vy, w, h, grounded, ... }
 
-import { PHYS } from './config.js';
+import { PHYS, PAW_BURST, PAW_BURST_MUL, AIM_MIN, AIM_MAX } from './config.js';
 import { solidsNear, floorBelow, surfaceAt, slopeAt } from './track.js';
 
 // Moves the body by its velocity for dt seconds and resolves collisions. Ground strips have
@@ -91,6 +91,23 @@ export function inStrip(list, b) {
   return null;
 }
 
+export const clampAim = (a) => Math.max(AIM_MIN, Math.min(AIM_MAX, a));
+
+// Starts an aimed blue-paw burst at `speed` (the animal's ability speed) toward `angle`.
+export function startBurst(r, angle, speed) {
+  let a = clampAim(angle || 0);
+  if (r.grounded && a < 0) a = 0; // can't dash into the ground
+  const v = speed * PAW_BURST_MUL;
+  r.burst = { t: PAW_BURST, vx: Math.cos(a) * v, vy: -Math.sin(a) * v, a };
+  if (r.burst.vy < 0) r.grounded = false;
+  r.climb = null;
+  r.slideT = 0;
+  r.dive = false;
+  r.airJump = false;
+  r.duck = false;
+  r.h = PHYS.h;
+}
+
 // One physics step of a runner's own movement: speed, jumping, sliding, climbing, gravity,
 // collisions. input: { jump (pressed this step), hold (jump held), duck (EĞİL pressed this step) }.
 // Returns the moveBody result plus `jumped`, `climbing` and `topped` (just climbed over a wall).
@@ -117,6 +134,32 @@ export function stepRunner(r, dt, T, input, topSpeed) {
         r.vx = 170;
         r.airJump = false;
         res.topped = true;
+      }
+      r.ground = res.ground;
+      return res;
+    }
+  }
+
+  // Blue-paw burst: straight along the aimed line with gravity off, then some of the rise carries
+  // on. A wall ends it (and is grabbed if climbable), so does a ceiling or landing from a dive.
+  if (r.burst) {
+    if (!free) r.burst = null;
+    else {
+      const B = r.burst;
+      B.t -= dt;
+      r.vx = B.vx;
+      r.vy = B.vy;
+      const res = moveBody(r, dt, T);
+      res.bursting = true;
+      const hitCeiling = B.vy < 0 && r.vy === 0;
+      const landed = B.vy > 0 && r.grounded;
+      if (B.t <= 0 || res.blocked || hitCeiling || landed) {
+        r.burst = null;
+        r.vy = B.vy < 0 && !hitCeiling ? B.vy * 0.5 : r.vy;
+        if (res.blocked && res.wall && res.wall.s.kind !== 'roof') {
+          const rise = r.y - res.wall.top;
+          if (rise > 0 && rise <= PHYS.climbReach) { r.climb = { top: res.wall.top, fast: true }; r.vy = 0; res.startClimb = true; }
+        }
       }
       r.ground = res.ground;
       return res;
@@ -187,6 +230,26 @@ export function stepRunner(r, dt, T, input, topSpeed) {
   return res;
 }
 
+function cloneBody(r) {
+  return { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut, duck: r.duck, slideT: r.slideT || 0, dive: r.dive, airJump: r.airJump, climb: null, burst: r.burst ? { ...r.burst } : null, canJump: true };
+}
+
+// The path an aimed blue paw would take from where the runner is now (the aiming player's
+// private arrow draws it): points every `every` steps for `seconds`.
+export function predictBurst(r, T, angle, speed, seconds = 0.85, dt = 1 / 60, every = 3) {
+  const b = cloneBody(r);
+  b.vx = r.vx;
+  startBurst(b, angle, speed);
+  const pts = [[b.x, b.y - 26]];
+  let i = 0;
+  for (let t = 0; t < seconds; t += dt) {
+    stepRunner(b, dt, T, { jump: false, hold: false }, speed);
+    if (++i % every === 0) pts.push([b.x, b.y - 26]);
+    if (b.y > T.lowest + 300) break;
+  }
+  return pts;
+}
+
 // Would standing up hit a wall block or a low roof?
 export function roofAbove(r, T) {
   const hw = r.w / 2;
@@ -202,8 +265,10 @@ export function roofAbove(r, T) {
 // Returns { danger, t } where danger is null, 'pit', 'wall' or 'spikes' and t the time it shows up.
 // duck: press EĞİL right now (to see whether sliding gets under a roof).
 // A wall counts as danger even though runners can climb it: jumping over is faster.
-export function simulate(r, T, topSpeed, jumpNow, horizon, dt = 1 / 60, duck = false) {
-  const b = { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut, duck: r.duck, slideT: r.slideT || 0, dive: r.dive, airJump: r.airJump, climb: null };
+// burst: { angle, speed } fires an aimed blue paw right now (the bots compare angles with it).
+export function simulate(r, T, topSpeed, jumpNow, horizon, dt = 1 / 60, duck = false, burst = null) {
+  const b = cloneBody(r);
+  if (burst) startBurst(b, burst.angle, burst.speed);
   let airborne = false;
   for (let t = 0; t < horizon; t += dt) {
     const res = stepRunner(b, dt, T, { jump: jumpNow && t === 0, hold: true, duck: duck && t === 0 }, topSpeed);

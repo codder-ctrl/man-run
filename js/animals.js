@@ -13,7 +13,21 @@ const cos = Math.cos;
 
 // ---- Pose ----
 
+// The pose for a runner, with the front arm pointing where the blue paw is aimed (everyone sees
+// it, so friends can watch you take aim).
 export function poseFor(r, t) {
+  const p = basePose(r, t);
+  if (typeof r.aim === 'number' && !(r.stun > 0) && !(r.dead > 0) && !r.climb) {
+    p.armF = -Math.PI / 2 - r.aim;
+    p.elbF = 0.05;
+    p.look = 0.2 + Math.max(0, Math.cos(r.aim)) * 0.6;
+    p.mouth = 1;
+    p.aiming = 1;
+  }
+  return p;
+}
+
+function basePose(r, t) {
   const p = {
     legF: 0, legB: 0, kneeF: 0, kneeB: 0, armF: 0, armB: 0, lean: 0, bob: 0, sq: 1,
     head: 0, blink: 0, mouth: 0, look: 0.4, tail: 0, scarf: 0, dizzy: 0, zap: 0, caught: 0, cheer: 0, slide: 0,

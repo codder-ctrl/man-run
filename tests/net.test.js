@@ -31,6 +31,8 @@ test('host and guest stay in step through a whole race', () => {
   let maxGap = 0;
   let hits = 0;
   let guestUses = 0;
+  let hostSawGuestAim = 0;
+  let guestSawBotAim = 0;
   let guestBoxes = 0;
   while (frame < 60 * 140 && !guestDone) {
     frame++;
@@ -52,6 +54,8 @@ test('host and guest stay in step through a whole race', () => {
       if (e.type === 'done') guestDone = true;
       if (e.type === 'hit' && e.id === 1) hits++;
     }
+    if (typeof host.runners[1].aim === 'number') hostSawGuestAim++;
+    if (guest.runners.some((r, i) => i > 1 && typeof r.aim === 'number')) guestSawBotAim++;
     const hg = host.runners[1];
     const gg = guest.player;
     if (host.phase === 'race' && hg.dead <= 0 && gg.dead <= 0 && !gg.finished) maxGap = Math.max(maxGap, Math.abs(hg.x - gg.x));
@@ -63,6 +67,8 @@ test('host and guest stay in step through a whole race', () => {
   assert.ok(guest.player.finished, 'guest knows it finished');
   assert.ok(maxGap < 80, `host view of the guest drifted ${maxGap}`);
   assert.ok(guestBoxes > 3 && guestUses > 2, 'the guest takes its own boxes and the host lets it use the items');
+  // Aiming the blue paw shows on the other phones (the pose; the arrow stays private).
+  assert.ok(hostSawGuestAim > 0 && guestSawBotAim > 0, `aim shared: host saw ${hostSawGuestAim}, guest saw ${guestSawBotAim}`);
   // Boxes are per runner: the host's and the guest's runners each took boxes of their own.
   assert.ok(host.T.boxes.some((b) => '0' in b.taken && '1' in b.taken), 'host and guest runner both have their own taken boxes');
 });

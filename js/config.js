@@ -1,7 +1,7 @@
 // Game constants: physics, animals, items. World units: y grows downward, a runner is about
 // 60 units tall, the view is VIEW_H units tall whatever the screen size.
 
-export const VERSION = '0.5.0';
+export const VERSION = '0.6.0';
 
 export const VIEW_H = 430;
 export const STEP = 1 / 120; // fixed physics step (seconds)
@@ -86,5 +86,13 @@ export const ABILITIES = {
   cat: { name: 'Kedi Çevikliği', speed: 540, time: 1.5, desc: 'sessiz ve hızlı' },
   panda: { name: 'Bambu Rüzgârı', speed: 470, time: 2.0, desc: 'uzun soluklu' },
 };
+
+// Aimed blue paw: hold the 🐾 button and drag to aim, release to fire. The runner bursts that way
+// for PAW_BURST seconds at its ability speed × PAW_BURST_MUL with gravity off, then the usual dash
+// boost carries on. Angles: 0 forward, +π/2 straight up, negative down-forward.
+export const PAW_BURST = 0.22;
+export const PAW_BURST_MUL = 1.2;
+export const AIM_MIN = -1.2;
+export const AIM_MAX = Math.PI / 2;
 
 export const PLACE_NAMES = ['1.', '2.', '3.', '4.'];

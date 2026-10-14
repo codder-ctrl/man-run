@@ -1,8 +1,9 @@
 // Draws the race: camera, layered world, runners, items and effects. Turns race events into
 // effects (dust, shards, bolts, shake, hit-stop).
 
-import { VIEW_H, ABILITIES } from './config.js';
+import { VIEW_H, ABILITIES, AIM_MIN, AIM_MAX } from './config.js';
 import { floorBelow } from './track.js';
+import { predictBurst } from './physics.js';
 import { drawAnimal, poseFor, drawTrap, ANIMAL } from './animals.js';
 import { createBackdrop, createTerrain, createForeground, createWeather, drawMud, drawPad, drawBox, drawDeco, drawFinish, LIVE_DECO, THEMES } from './scenery.js';
 import { createFx, drawSaw, drawAnvil } from './fx.js';
@@ -216,6 +217,8 @@ export function createRenderer(canvas) {
       if (sw.grounded) fx.grind(sw.x - 6, sw.y - 1, -1);
     }
     for (const a of race.anvils) drawAnvilDrop(a, t);
+    // The aiming player's own arrow and predicted path: only on this screen.
+    if (typeof p.aim === 'number' && p.dead <= 0) drawAimGuide(p, t);
     mark('runners');
 
     if (vis(T.finishX, 70, 100)) drawFinish(ctx, T.finishX, floorBelow(T, T.finishX, -Infinity), t, true);
@@ -263,7 +266,7 @@ export function createRenderer(canvas) {
     if (!tr) { tr = { list: [], acc: 0 }; trails.set(r.id, tr); }
     for (const g of tr.list) g.age += dt;
     tr.list = tr.list.filter((g) => g.age < 0.25);
-    if ((r.boost > 0 || r.pad > 0 || r.dash > 0) && r.dead <= 0 && r.vx > 200) {
+    if ((r.boost > 0 || r.pad > 0 || r.dash > 0) && r.dead <= 0 && (r.burst || Math.hypot(r.vx, r.vy) > 200)) {
       tr.acc += dt;
       if (tr.acc > 0.045) {
         tr.acc = 0;
@@ -303,6 +306,41 @@ export function createRenderer(canvas) {
       glow(ctx, r.x - 10, r.y - 26, 40, r.dash > 0 ? '#4aa8ff' : r.boost > 0 ? '#ff8a3a' : '#ffd23f', 0.42);
       ctx.restore();
       if (Math.random() < 0.6) fx.speedLine(r.x - 34 - Math.random() * 24, r.y - 8 - Math.random() * 44);
+    }
+    // Aiming the blue paw: a glowing orb in the raised paw (everyone sees where it points).
+    if (typeof r.aim === 'number' && r.stun <= 0 && r.dead <= 0 && !r.climb) {
+      const hx = r.x + 2 + Math.cos(r.aim) * 15;
+      const hy = r.y - 29 - Math.sin(r.aim) * 15;
+      const pulse = 1 + Math.sin(t * 14) * 0.15;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      glow(ctx, hx, hy, 22 * pulse, '#4aa8ff', 0.75);
+      glow(ctx, r.x, r.y - 26, 40, '#4aa8ff', 0.25);
+      ctx.restore();
+      flat(ctx, circle(hx, hy, 5 * pulse), '#e8f6ff');
+      for (let i = 0; i < 3; i++) {
+        const a = t * 6 + (i * Math.PI * 2) / 3;
+        flat(ctx, circle(hx + Math.cos(a) * 9, hy + Math.sin(a) * 9, 1.6), '#bfe4ff', 0.9);
+      }
+      if (Math.random() < dt * 20) fx.sparks(hx, hy, '#8fd0ff', 1, 0.3);
+    }
+    // A blue streak along the burst.
+    if (r.burst) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const len = 46;
+      const ang = Math.atan2(r.burst.vy, r.burst.vx);
+      const g = ctx.createLinearGradient(r.x, r.y - 26, r.x - Math.cos(ang) * len, r.y - 26 - Math.sin(ang) * len);
+      g.addColorStop(0, 'rgba(120,200,255,0.75)');
+      g.addColorStop(1, 'rgba(120,200,255,0)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 22;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(r.x, r.y - 26);
+      ctx.lineTo(r.x - Math.cos(ang) * len, r.y - 26 - Math.sin(ang) * len);
+      ctx.stroke();
+      ctx.restore();
     }
     // Blue paw prints while dashing.
     if (r.dash > 0 && r.grounded) {
@@ -353,6 +391,48 @@ export function createRenderer(canvas) {
     if (isPlayer) flat(ctx, poly([[r.x - 5, ly + 8], [r.x + 5, ly + 8], [r.x, ly + 14]]), '#ffd23f');
     ctx.fillStyle = isPlayer ? '#4a2a10' : '#ffffff';
     ctx.fillText(label, r.x, ly + 0.5);
+  }
+
+  // The private aim guide: a range arc, the predicted path as dots, and a pulsing arrow.
+  function drawAimGuide(r, t) {
+    const cx = r.x;
+    const cy = r.y - 30;
+    const speed = ABILITIES[r.animal].speed;
+    // Range the paw can be aimed in.
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 58, -AIM_MAX, -AIM_MIN);
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+    // Where the burst would take you.
+    const pts = predictBurst(r, race.T, r.aim, speed);
+    for (let i = 1; i < pts.length; i++) {
+      const k = i / pts.length;
+      const [x, y] = pts[i];
+      const rad = 4.2 - k * 2;
+      ctx.globalAlpha = 0.95 - k * 0.6;
+      blob(ctx, circle(x, y, rad), '#bfe4ff', { ow: 1.4, ink: '#1d4f8a', depth: 0, shade: false, light: false });
+    }
+    ctx.globalAlpha = 1;
+    // The arrow itself, breathing a little.
+    const len = 84 + Math.sin(t * 9) * 5;
+    const start = 30; // leave the glowing paw in the hand visible
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-r.aim);
+    const shaft = (c) => { c.moveTo(start, -5); c.lineTo(len - 18, -5); c.lineTo(len - 18, -13); c.lineTo(len, 0); c.lineTo(len - 18, 13); c.lineTo(len - 18, 5); c.lineTo(start, 5); c.closePath(); };
+    ctx.globalCompositeOperation = 'lighter';
+    glow(ctx, len - 12, 0, 26, '#4aa8ff', 0.5);
+    ctx.globalCompositeOperation = 'source-over';
+    blob(ctx, shaft, '#4aa8ff', { ow: 2.4, depth: 2.5, shade: '#2a6fd0', light: '#bfe4ff' });
+    // A light running along the arrow shows it's live.
+    const ph = (t * 1.8) % 1;
+    flat(ctx, circle(start + (len - start - 14) * ph, 0, 3), '#ffffff', 1 - ph);
+    ctx.restore();
   }
 
   function drawAnvilDrop(a, t) {

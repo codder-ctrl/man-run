@@ -66,7 +66,7 @@
     <div id="touch-jump" class="touch-jump"></div>
     <button id="btn-jump" class="round-btn jump-btn" aria-label="Zıpla"><span>▲</span><small>ZIPLA</small></button>
     <button id="btn-duck" class="round-btn duck-btn" aria-label="Eğil"><span>▼</span><small>EĞİL</small></button>
-    <button id="btn-paw" class="round-btn paw-btn" aria-label="Mavi pati"><span class="paw-fill"></span><span class="paw-icon">🐾</span></button>
+    <button id="btn-paw" class="round-btn paw-btn" aria-label="Mavi pati: basılı tut, kaydırarak nişan al, bırak"><span class="paw-fill"></span><span class="paw-icon">🐾</span><span id="paw-knob" class="paw-knob"></span><small class="paw-hint">Basılı tut</small></button>
     <button id="btn-item" class="round-btn item-btn empty" aria-label="Eşya kullan"><canvas id="item-icon" width="120" height="120"></canvas><small id="item-name"></small></button>
   </section>
 
@@ -158,7 +158,7 @@
         <li><b>Eşya:</b> sağ alttaki düğme (bilgisayarda <kbd>E</kbd>). Eşyaları <span class="qbox">?</span> kutularından alırsın.</li>
         <li><b>Eğil:</b> <b>EĞİL</b>'e bir kez dokun (bilgisayarda <kbd>↓</kbd>): kısa bir süre kayarsın, sonra kendin kalkarsın. Alçak kaya tavanlarının altından böyle geçilir; havadayken dokunursan hızla yere iner, kayarak devam edersin.</li>
         <li><b>Tırman:</b> Duvara çarparsan tutunup tırmanırsın; tırmanırken zıplamayı basılı tutarsan daha hızlı çıkarsın. Kenarı az farkla kaçırırsan da kenara tutunursun.</li>
-        <li><b>Mavi pati:</b> 🐾 düğmesi zamanla dolar. Dolunca dokun (bilgisayarda <kbd>Q</kbd>): her hayvan kendi tarzında hızlanır.</li>
+        <li><b>Mavi pati:</b> 🐾 düğmesi zamanla dolar. Dolunca <b>basılı tut ve parmağını kaydır</b>: ekranında bir ok ve gideceğin yol çıkar. Bırakınca o yöne atılırsın; yukarı atarak duvarların ve çukurların üstünden geçebilirsin. Kısa dokunuş düz ileri atar. (Bilgisayarda <kbd>Q</kbd>'yu basılı tut, <kbd>↑</kbd>/<kbd>↓</kbd> ile nişan al, bırak.)</li>
       </ul>
       <div id="help-items" class="help-items"></div>
       <p class="tip">Sarı oklar seni hızlandırır, çamur yavaşlatır, dikenler sersemletir. Zıplarken ve kayarken biraz yavaşlarsın, gereksiz zıplama! Çukura düşersen biraz geriden devam edersin.</p>

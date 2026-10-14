@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.5.0** (tırmanma, zıplama/kayma cezası, tek dokunuşla kayma, kişiye özel kutular, README). Kullanıcının telefonda denemesi ve puanı bekleniyor.
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.5.0**. Yerelde hazır: **v0.6.0** (nişanlı mavi pati; "yükle" bekleniyor).
 
 ## Proje
 
@@ -153,6 +153,20 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.5.0** (tırmanma, zıplama/kay
 - **Takılma:** Kalite düşürmesi artık yarışın ortasında olmuyor (bir sonraki yarışta ya da geri sayımda uygulanıyor). Telefonlar baştan bir kademe hafif başlıyor. Duvarlarda durma da tırmanmayla çözüldü.
 - **README:** Slasher Hero gibi yazıldı. En üstte "▶ Play Man Run" linki var. Repo sayfasının "About" kısmına da canlı adres eklendi.
 - Gizli sekmede ekran boyutu 0 görünürken oyunun çökmesi düzeltildi.
+
+## v0.6.0'da olanlar (nişanlı mavi pati, kullanıcının isteği)
+
+- **Nişan:** 🐾 dolunca basılı tutup parmağını kaydırırsın. Brawl Stars'taki gibi: basılan noktadan parmağa giden yön nişan olur. Düğmenin içindeki top parmağı takip eder.
+- **Sadece nişan alanın ekranında:** Karakterden çıkan nefes alan mavi bir ok, gideceğin yolu gösteren noktalı rota ve nişan aralığını gösteren soluk bir yay. Rota fizikle önceden hesaplanıyor; gerçek atılış onu birebir izliyor (en fazla 5 birim fark).
+- **Herkesin gördüğü:** Karakterin ön kolu nişan yönünü gösterir, elinde parlayan mavi bir top olur. Arkadaşlar ve botlar da canlı görür.
+- **Bırakınca:**
+  - O yöne 0,22 saniyelik bir atılış (yerçekimi yok), sonra normal pati hızlanması devam eder.
+  - Yukarı: duvar ve çukurların üstünden uçar (normal zıplamadan yaklaşık 1,35 kat yüksek).
+  - İleri: yerde atılış.
+  - Havada aşağı: dalış.
+  - Kısa dokunuş düz ileri atar.
+- **Klavye:** Q'yu basılı tut, ↑/↓ ile nişan al, bırak.
+- **Botlar:** Kısa bir süre görünür şekilde nişan alıp en uzağa götüren güvenli açıyı seçiyorlar (çoğunlukla ileri, bazen yukarı).
 
 ## Öğrenilenler
 
