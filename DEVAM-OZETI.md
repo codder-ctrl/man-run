@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-13. Canlı sürüm: **v0.3.0**. Yerelde hazır: **v0.4.0** (telefona yükleme düğmesi, eğilme, mavi pati; "yükle" bekleniyor).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.4.0** (telefona yükleme düğmesi, eğilme, mavi pati).
 
 ## Proje
 
@@ -46,6 +46,14 @@ Son güncelleme: 2026-10-13. Canlı sürüm: **v0.3.0**. Yerelde hazır: **v0.4.
 - Akıcılık: Hâlâ Fun Run kadar akıcı değil, mekaniklerin gelişmesi gerekiyor.
 - Grafik, efektler, ses: Şimdilik iyi, sonra geliştirilecek.
 - Oynanış: **Eğilme** ve her karakterin kendi **mavi pati yeteneği** (hızlanma yeteneği) eklenecek.
+
+**v0.4.0, kullanıcının puanları** (2026-10-14; "Neden" notları v0.2'dekilerle aynı kaldı):
+
+| Akıcılık | Grafik | Efektler | Ses | Oynanış |
+|---|---|---|---|---|
+| 5 | 6 | 7 | 7 | 5,5 |
+
+- **Akıcılık hâlâ 5:** Sürekli tekrarlanan şikâyet "Fun Run kadar akıcı değil, mekanikler gelişmeli". Sıradaki geliştirme turunda öncelik bu olmalı; kullanıcıya neyin akıcı gelmediğini somut sor.
 
 **Sıra (kullanıcı, 2026-10-13):** Önce arkadaşlarla oynanabilir hale getirmek, sonra oyunu geliştirmek (eğilme, mavi pati, akıcılık).
 
