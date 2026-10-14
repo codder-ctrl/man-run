@@ -180,12 +180,16 @@ function tickTimers(race, r, dt) {
   if (wasStunned && r.stun === 0) r.stunKind = null;
 }
 
-function pickupBoxes(race, r) {
+// "?" boxes are per runner: taking one hides it only for you (b.taken[runnerId] = respawn time
+// left), so everyone gets their own box at the same spot. A guest only marks its own boxes
+// (the host rolls the item).
+function pickupBoxes(race, r, visualOnly = false) {
   for (const b of race.T.boxes) {
-    if (b.t > 0 || Math.abs(b.x - r.x) > 30) continue;
+    if (b.taken[r.id] > 0 || Math.abs(b.x - r.x) > 30) continue;
     if (r.y - r.h < b.y + 15 && r.y > b.y - 15) {
-      b.t = BOX_RESPAWN;
+      b.taken[r.id] = BOX_RESPAWN;
       emit(race, 'box', { id: r.id, x: b.x, y: b.y });
+      if (visualOnly) continue;
       if (!r.item) {
         r.item = rollItem(race, r);
         r.rolling = r.ctrl === 'bot' ? 0.01 : 0.9;
@@ -228,6 +232,10 @@ function updateRunner(race, r, dt, input) {
   const wasGrounded = r.grounded;
   const res = stepRunner(r, dt, T, r.canJump ? input : { jump: false, hold: false }, topSpeed(race, r));
   if (res.jumped) emit(race, 'jump', { id: r.id });
+  if (res.startClimb) emit(race, 'climb', { id: r.id });
+  if (res.topped) emit(race, 'topped', { id: r.id });
+  if (input.duck && r.duck && r.grounded) emit(race, 'slide', { id: r.id });
+  r.climbPhase = r.climb ? ((r.climbPhase || 0) + dt * 4) % 1 : 0;
   if (res.landed && r.airTime > 0.25) emit(race, 'land', { id: r.id, hard: r.airTime > 0.7 });
   r.airTime = r.grounded ? 0 : r.airTime + dt;
   if (r.grounded) r.runPhase = ((r.runPhase || 0) + (r.vx * dt) / 62) % 1;
@@ -240,7 +248,7 @@ function updateRunner(race, r, dt, input) {
     r.pad = PAD_TIME;
   }
   if (r.shield <= 0 && onSpikes(r, T)) hit(race, r, 'spikes');
-  if (race.role !== 'guest') pickupBoxes(race, r);
+  pickupBoxes(race, r, race.role === 'guest');
 
   if (r.y > T.lowest + PHYS.killY * 0.6) {
     r.dead = PHYS.respawnDelay;
@@ -264,7 +272,7 @@ function updateRemote(race, r, dt) {
       r.y = n.y + (n.grounded || n.dead > 0 ? 0 : n.vy * age);
       r.vx = n.vx; r.vy = n.vy; r.grounded = n.grounded; r.dead = n.dead; r.deathX = n.deathX;
       r.runPhase = n.runPhase; r.slope = n.slope; r.inMud = n.inMud;
-      r.duck = n.duck; r.h = n.duck ? PHYS.duckH : PHYS.h; r.dash = n.dash;
+      r.duck = n.duck; r.h = n.duck ? PHYS.duckH : PHYS.h; r.dash = n.dash; r.climb = n.climb ? { top: r.y } : null;
     }
     if (r.dead <= 0) pickupBoxes(race, r);
     checkFinish(race, r);
@@ -278,6 +286,7 @@ function updateRemote(race, r, dt) {
     if (r.lastSt === 'dead') emit(race, 'respawn', { id: r.id, remote: true });
   }
   r.lastSt = st;
+  r.climbPhase = r.climb ? ((r.climbPhase || 0) + dt * 4) % 1 : 0;
   if (r.dash > 0 && !(r.lastDash > 0)) emit(race, 'paw', { id: r.id, remote: true });
   r.lastDash = r.dash;
 }
@@ -374,7 +383,7 @@ export function stepRace(race, dt, input = {}) {
     if (race.time >= 0) { race.phase = 'race'; emit(race, 'go'); }
   }
   const T = race.T;
-  if (!guest) for (const b of T.boxes) if (b.t > 0) b.t = Math.max(0, b.t - dt);
+  for (const b of T.boxes) for (const k in b.taken) if (b.taken[k] > 0) b.taken[k] = Math.max(0, b.taken[k] - dt);
 
   for (const r of race.runners) {
     if (race.phase === 'countdown') continue;

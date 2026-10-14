@@ -1,7 +1,7 @@
 // Game constants: physics, animals, items. World units: y grows downward, a runner is about
 // 60 units tall, the view is VIEW_H units tall whatever the screen size.
 
-export const VERSION = '0.4.0';
+export const VERSION = '0.5.0';
 
 export const VIEW_H = 430;
 export const STEP = 1 / 120; // fixed physics step (seconds)
@@ -21,7 +21,12 @@ export const PHYS = {
   w: 26, // runner box width
   h: 50, // runner box height
   duckH: 28, // box height while ducking (low roofs leave 32 units)
-  fastFall: 2600, // extra pull while ducking in the air
+  slideTime: 0.7, // one press of EĞİL slides this long, then the runner stands up again
+  fastFall: 2600, // extra pull while diving (EĞİL pressed in the air)
+  moveSlow: 0.8, // top speed multiplier while in the air after a jump and while sliding
+  airDecel: 600, // how fast the speed drops to that in the air (on the ground: 1400)
+  climb: 240, // climbing speed up a wall (doubled while jump is held)
+  climbReach: 120, // walls whose top is at most this far above the feet can be climbed
   stepUp: 10, // ledges this low are walked up without jumping
   killY: 700, // falling this far below the lowest ground respawns the runner
   respawnDelay: 0.9,

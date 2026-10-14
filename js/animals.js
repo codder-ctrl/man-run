@@ -57,6 +57,16 @@ export function poseFor(r, t) {
     return p;
   }
 
+  if (r.climb) {
+    // Climbing: hands over hands, feet pushing, looking up at the top.
+    const ph = (r.climbPhase || 0) * TAU;
+    const s = Math.sin(ph);
+    p.armF = -2.9 + s * 0.45; p.armB = -2.6 - s * 0.45; p.elbF = 0.5; p.elbB = 0.5;
+    p.legF = -0.7 + s * 0.5; p.kneeF = 1.2; p.legB = -0.3 - s * 0.5; p.kneeB = 1.3;
+    p.lean = 0.2; p.look = 0.6; p.mouth = 2; p.head = -0.2; p.tail = -0.3; p.bob = -Math.abs(s) * 2;
+    return p;
+  }
+
   if (r.duck) {
     if (r.grounded) {
       // Baseball slide: lying back, feet first, arms trailing.

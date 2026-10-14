@@ -326,7 +326,9 @@ function handleEvent(e) {
     case 'go': countdown('KOŞ!', true); sfx('go'); break;
     case 'jump': if (me) sfx('jump'); break;
     case 'land': if (me) sfx('land'); break;
-    case 'box': if (me || near) sfx('box'); break;
+    case 'box': if (me) sfx('box'); break;
+    case 'climb': if (me) sfx('climb'); break;
+    case 'slide': if (me) sfx('duck'); break;
     case 'itemReady': if (me) { setItem(r.item); sfx('itemReady'); } break;
     case 'use':
       if (me) setItem(null);
@@ -428,19 +430,14 @@ function resume() {
 
 // ---- Input ----
 
-const input = { jumpQueued: false, hold: false, itemQueued: false, duck: false, pawQueued: false };
-const ducks = new Set();
-function duckDown(src) {
+const input = { jumpQueued: false, hold: false, itemQueued: false, duckQueued: false, pawQueued: false };
+// EĞİL is a tap, like jumping: one press slides for a moment (or dives in the air).
+function duckPress() {
   initAudio();
-  if (!ducks.size) sfx('duck');
-  ducks.add(src);
-  input.duck = true;
-  $('btn-duck').classList.add('down');
-}
-function duckUp(src) {
-  ducks.delete(src);
-  input.duck = ducks.size > 0;
-  if (!input.duck) $('btn-duck').classList.remove('down');
+  input.duckQueued = true;
+  const b = $('btn-duck');
+  b.classList.add('down');
+  setTimeout(() => b.classList.remove('down'), 140);
 }
 const held = new Set();
 function jumpDown(src) {
@@ -464,7 +461,7 @@ window.addEventListener('keydown', (e) => {
   if (mode === 'race') {
     if (JUMP_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) jumpDown('k' + e.code); }
     else if (ITEM_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.itemQueued = true; }
-    else if (DUCK_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) duckDown('k' + e.code); }
+    else if (DUCK_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) duckPress(); }
     else if (PAW_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) input.pawQueued = true; }
     else if (e.code === 'Escape' || e.code === 'KeyP') pause();
   } else if (mode === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
@@ -473,7 +470,6 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
   if (JUMP_KEYS.has(e.code)) jumpUp('k' + e.code);
-  if (DUCK_KEYS.has(e.code)) duckUp('k' + e.code);
 });
 
 for (const id of ['touch-jump', 'btn-jump']) {
@@ -489,16 +485,8 @@ for (const id of ['touch-jump', 'btn-jump']) {
 }
 $('btn-item').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.itemQueued = true; });
 $('btn-paw').addEventListener('pointerdown', (e) => { e.preventDefault(); initAudio(); input.pawQueued = true; });
-{
-  const el = $('btn-duck');
-  el.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    duckDown('p' + e.pointerId);
-    try { el.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
-  });
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, (e) => duckUp('p' + e.pointerId));
-}
-window.addEventListener('blur', () => { held.clear(); ducks.clear(); input.hold = false; input.duck = false; if (!sync) pause(); });
+$('btn-duck').addEventListener('pointerdown', (e) => { e.preventDefault(); duckPress(); });
+window.addEventListener('blur', () => { held.clear(); input.hold = false; if (!sync) pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && !sync) pause(); });
 
 $('btn-race').addEventListener('click', startRace);
@@ -723,8 +711,9 @@ function frame(now, fromRaf) {
       const n = Math.max(1, Math.ceil(dt / STEP - 0.01));
       const sdt = dt / n;
       for (let i = 0; i < n && mode === 'race'; i++) {
-        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duck, paw: input.pawQueued };
+        const inp = { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued };
         input.jumpQueued = false;
+        input.duckQueued = false;
         input.itemQueued = false;
         input.pawQueued = false;
         stepRace(race, sdt, inp);
@@ -848,8 +837,9 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
   // advance(s): run the race s seconds synchronously (hidden panes throttle animation frames).
   const advance = (sec) => {
     for (let i = 0; i < sec / STEP && race && mode === 'race'; i++) {
-      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duck, paw: input.pawQueued });
+      stepRace(race, STEP, { jump: input.jumpQueued, hold: input.hold, item: input.itemQueued, duck: input.duckQueued, paw: input.pawQueued });
       input.jumpQueued = false;
+      input.duckQueued = false;
       input.itemQueued = false;
       input.pawQueued = false;
       for (const e of race.events) handleEvent(e);

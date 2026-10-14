@@ -10,7 +10,7 @@ const TICK = 1 / 30;
 export function createBot(r, skill, R) {
   let acc = 0;
   let holdT = 0;
-  let duckT = 0;
+  let pressDuck = false;
   let pressJump = false;
   let hesitate = 0;
   let seenDanger = null;
@@ -27,7 +27,6 @@ export function createBot(r, skill, R) {
     think(race, dt) {
       acc += dt;
       holdT = Math.max(0, holdT - dt);
-      duckT = Math.max(0, duckT - dt);
       hesitate = Math.max(0, hesitate - dt);
       rubberBand(race);
       if (r.item && r.rolling <= 0) items(race, dt);
@@ -41,8 +40,9 @@ export function createBot(r, skill, R) {
         pawWait -= dt;
         if (pawWait <= 0 && r.grounded && r.stun <= 0) { paw = true; pawWait = 0.5 + R() * 3; }
       }
-      const out = { jump: pressJump, hold: holdT > 0 || r.vy < -60, duck: duckT > 0, paw };
+      const out = { jump: pressJump, hold: holdT > 0 || r.vy < -60 || !!r.climb, duck: pressDuck, paw };
       pressJump = false;
+      pressDuck = false;
       return out;
     },
   };
@@ -58,7 +58,7 @@ export function createBot(r, skill, R) {
   }
 
   function decide(race) {
-    if (r.dead > 0 || r.stun > 0 || !r.grounded && r.coyote <= 0) return;
+    if (r.dead > 0 || r.stun > 0 || r.climb || !r.grounded && r.coyote <= 0) return;
     if (race.phase !== 'race') return;
     const T = race.T;
     let top = (r.boost > 0 || r.pad > 0 ? PHYS.boost : r.inMud && r.dash <= 0 ? PHYS.mud : PHYS.run) * bot.speedMul;
@@ -72,11 +72,12 @@ export function createBot(r, skill, R) {
       if (R() < skill.slip * (r.finished ? 0 : 1)) hesitate = 0.18 + R() * 0.15;
     }
     if (hesitate > 0) return;
-    if (ahead.danger === 'wall' && !simulate(r, T, top, false, 0.6, 1 / 60, true).danger) {
+    if (ahead.danger === 'wall' && !r.duck && !simulate(r, T, top, false, 0.6, 1 / 60, true).danger) {
       // A low roof: slide under it (late reactions crash into it, like a missed jump).
-      if (R() < skill.react + (ahead.t < 0.2 ? 0.3 : 0) || ahead.t < 0.1) duckT = 0.4;
+      if (R() < skill.react + (ahead.t < 0.2 ? 0.3 : 0) || ahead.t < 0.1) pressDuck = true;
       return;
     }
+    if (r.duck) return;
     const jump = simulate(r, T, top, true, 1.4);
     const ok = !jump.danger;
     const urgent = ahead.t < 0.12;

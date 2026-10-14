@@ -91,13 +91,14 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
   const gapDown = (w, dy) => { endPiece(); x += Math.round(w); gy += Math.round(dy); startPiece(); };
 
   const respawn = () => T.respawns.push({ x: x + 30, y: gy });
-  const box = (bx, by) => T.boxes.push({ x: bx, y: by, t: 0, id: T.boxes.length });
+  const box = (bx, by) => T.boxes.push({ x: bx, y: by, taken: {}, id: T.boxes.length });
   const deco = (kind, dx = x, dy = null) => T.deco.push({ kind, x: dx, y: dy, r: R() });
   const decoSet = (THEMES[theme] || THEMES.forest).decoSet;
   const sprinkle = (from, to) => {
     for (let p = from + rnd(20, 80); p < to - 30; p += rnd(60, 170)) deco(pick(decoSet), p);
   };
-  const boxRow = (bx, n = 3) => { for (let i = 0; i < n; i++) box(bx + i * 58, null); };
+  // One box per spot (boxes are per runner, so everybody gets this one).
+  const boxRow = (bx) => box(bx + 40, null);
   const clampY = (y) => Math.max(-320, Math.min(220, y));
 
   // ---- Segments (d: difficulty 0..1 along the track) ----
@@ -142,7 +143,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       run(rnd(240, 320), clampY(gy + rnd(60, 110)));
       const b = x;
       run(rnd(60, 120));
-      if (R() < 0.6) boxRow(b - 20, 2);
+      if (R() < 0.6) boxRow(b - 20);
       run(rnd(240, 320), y0);
       run(60);
       sprinkle(s, x);
@@ -153,7 +154,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       run(80);
       run(rnd(240, 300), clampY(gy + rnd(50, 90)));
       run(rnd(30, 60));
-      gap(rnd(90, 115 + d * 40));
+      gap(rnd(90, 110 + d * 32));
       run(rnd(160, 220));
     },
     pit(d) {
@@ -161,7 +162,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       const s = x;
       run(rnd(120, 180));
       sprinkle(s, x - 40);
-      gap(rnd(80, 105 + d * 55));
+      gap(rnd(80, 100 + d * 45)); // jumps cost speed: 145 is the widest
       run(rnd(140, 200));
     },
     doublePit(d) {
@@ -257,8 +258,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
         T.solids.push({ x: px, y: py, w: pl, h: 18, kind: 'plat' });
         px += pl + 40;
       }
-      box(s + len / 2 - 29, py - 34);
-      box(s + len / 2 + 29, py - 34);
+      box(s + len / 2, py - 34);
       if (R() < 0.5) T.spikes.push({ x: s + len * 0.35, y: gy, w: Math.round(rnd(50, 70)) });
       else T.mud.push({ x: s + 60, y: gy, w: len - 120 });
       run(len);
@@ -310,7 +310,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       respawn();
       const s = x;
       run(rnd(140, 180));
-      boxRow(x, R() < 0.5 ? 3 : 4);
+      boxRow(x);
       run(rnd(300, 380));
       sprinkle(s, s + 100);
     },
@@ -331,7 +331,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
   let prev = '';
   while (x < length) {
     const d = Math.min(1, x / length);
-    if (x - lastBox > 950) {
+    if (x - lastBox > 800) {
       SEG.boxes(d);
       lastBox = x;
       prev = 'boxes';

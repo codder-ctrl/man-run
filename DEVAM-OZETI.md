@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.4.0** (telefona yükleme düğmesi, eğilme, mavi pati).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.4.0**. Yerelde hazır: **v0.5.0** (tırmanma, zıplama/kayma cezası, tek dokunuşla kayma, kişiye özel kutular, README; "yükle" bekleniyor).
 
 ## Proje
 
@@ -133,6 +133,26 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.4.0** (telefona yükleme düğ
     | Panda | Bambu Rüzgârı | uzun soluklu |
 
   - Menüde seçili hayvanın yeteneği yazıyor. Botlar da kullanıyor, çevrim içi oyunda da çalışıyor.
+
+## v0.5.0'da olanlar (kullanıcının istekleri, 2026-10-14)
+
+- **Duvara tırmanma:**
+  - Duvara çarpan karakter tutunup tırmanır, tepede küçük bir sıçrayışla üstüne çıkar.
+  - Zıplamayı basılı tutarsan iki kat hızlı tırmanır.
+  - Çukurun karşı kenarını az farkla kaçırırsan kenara tutunur.
+  - Kaya tavanlarına tırmanılmaz.
+- **Zıplama ve kayma cezası:** Zıpladıktan sonra havadayken ve kayarken en yüksek hız 0,8'e düşer. En geniş çukurlar 145'e daraltıldı.
+- **Tek dokunuşla eğilme:**
+  - EĞİL'e bir kez dokununca 0,7 saniye kayar, sonra kendisi kalkar.
+  - Tavanın altındaysa tavandan çıkana kadar eğik kalır.
+  - Havadayken dokunursa hızla iner ve kayarak devam eder.
+- **Kişiye özel kutular:**
+  - Her yerde tek kutu var (art arda 3-4 kutu kalktı), yaklaşık her 800 birimde bir.
+  - Kutuyu alan sadece kendi ekranında kaybeder; herkes aynı kutuyu alır.
+  - Tek kişilikte de, arkadaşla oynarken de böyle. Yarış başına eşya kullanımı 8'den 35-40'a çıktı.
+- **Takılma:** Kalite düşürmesi artık yarışın ortasında olmuyor (bir sonraki yarışta ya da geri sayımda uygulanıyor). Telefonlar baştan bir kademe hafif başlıyor. Duvarlarda durma da tırmanmayla çözüldü.
+- **README:** Slasher Hero gibi yazıldı. En üstte "▶ Play Man Run" linki var. Repo sayfasının "About" kısmına da canlı adres eklendi.
+- Gizli sekmede ekran boyutu 0 görünürken oyunun çökmesi düzeltildi.
 
 ## Öğrenilenler
 

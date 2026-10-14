@@ -30,16 +30,22 @@ test('host and guest stay in step through a whole race', () => {
   let guestDone = false;
   let maxGap = 0;
   let hits = 0;
+  let guestUses = 0;
+  let guestBoxes = 0;
   while (frame < 60 * 140 && !guestDone) {
     frame++;
     while (toHost.length && toHost[0][0] <= frame) hostSync.receive('g1', toHost.shift()[1]);
     stepRace(host, DT);
-    for (const e of host.events) hostSync.event(e);
+    for (const e of host.events) {
+      hostSync.event(e);
+      if (e.type === 'use' && e.id === 1) guestUses++;
+    }
     host.events.length = 0;
     hostSync.tick(DT);
 
     while (toGuest.length && toGuest[0][0] <= frame) guestSync.receive(toGuest.shift()[1]);
     stepRace(guest, DT);
+    for (const e of guest.events) if (e.type === 'box' && e.id === 1) guestBoxes++;
     guest.events.length = 0;
     guestSync.tick(DT);
     for (const e of guestSync.takeEvents()) {
@@ -50,10 +56,13 @@ test('host and guest stay in step through a whole race', () => {
     const gg = guest.player;
     if (host.phase === 'race' && hg.dead <= 0 && gg.dead <= 0 && !gg.finished) maxGap = Math.max(maxGap, Math.abs(hg.x - gg.x));
   }
-  console.log(`frames ${frame}, host phase ${host.phase}, guest done ${guestDone}, max gap ${maxGap.toFixed(1)}, guest hit ${hits}x`);
+  console.log(`frames ${frame}, host phase ${host.phase}, guest done ${guestDone}, max gap ${maxGap.toFixed(1)}, guest hit ${hits}x, took ${guestBoxes} boxes, used ${guestUses} items`);
   console.log('host places', host.order.map((r) => `${r.name || r.animal}:${r.finished ? r.finishTime.toFixed(1) : '-'}`).join(' '));
   assert.ok(host.runners[1].finished, 'guest runner finished on the host');
   assert.ok(guestDone, 'guest heard the race end');
   assert.ok(guest.player.finished, 'guest knows it finished');
   assert.ok(maxGap < 80, `host view of the guest drifted ${maxGap}`);
+  assert.ok(guestBoxes > 3 && guestUses > 2, 'the guest takes its own boxes and the host lets it use the items');
+  // Boxes are per runner: the host's and the guest's runners each took boxes of their own.
+  assert.ok(host.T.boxes.some((b) => '0' in b.taken && '1' in b.taken), 'host and guest runner both have their own taken boxes');
 });

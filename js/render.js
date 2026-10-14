@@ -26,13 +26,26 @@ export function createRenderer(canvas) {
 
   // Quality steps: if frames stay slow the canvas resolution drops, then extras turn off.
   const QUALITY = [{ dpr: 1.75 }, { dpr: 1.4 }, { dpr: 1.15, noVignette: true }, { dpr: 1, noVignette: true, noWeather: true, noFore: true }];
-  let quality = 0;
+  // Phones start one step down. A change rebuilds every cached layer, which itself hitches, so
+  // mid-race it waits for the next race (only the countdown applies it at once).
+  let quality = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
+  let pendingQuality = quality;
   let slowT = 0;
-  let fastT = 0;
   function reportFrame(dt) {
     if (dt > 0.1) return; // tab switches, hiccups
-    if (dt > 1 / 45) { slowT += dt; fastT = 0; } else { fastT += dt; slowT = Math.max(0, slowT - dt * 0.5); }
-    if (slowT > 1.5 && quality < QUALITY.length - 1) { quality++; slowT = 0; resize(); }
+    if (dt > 1 / 45) slowT += dt;
+    else slowT = Math.max(0, slowT - dt * 0.5);
+    if (slowT > 1.5 && pendingQuality < QUALITY.length - 1) {
+      pendingQuality++;
+      slowT = 0;
+      if (race && race.phase === 'countdown') applyQuality();
+    }
+  }
+  function applyQuality() {
+    if (pendingQuality === quality) return;
+    quality = pendingQuality;
+    resize();
+    if (world) world.terrain.clear();
   }
 
   function resize() {
@@ -42,7 +55,7 @@ export function createRenderer(canvas) {
     H = Math.max(1, Math.round(rect.height * dpr));
     canvas.width = W;
     canvas.height = H;
-    viewH = rect.height < 420 ? VIEW_H * 0.94 : VIEW_H;
+    viewH = rect.height < 420 && rect.height > 0 ? VIEW_H * 0.94 : VIEW_H;
     scale = H / viewH;
     viewW = W / scale;
   }
@@ -55,6 +68,7 @@ export function createRenderer(canvas) {
 
   function setRace(r) {
     race = r;
+    applyQuality();
     theme = THEMES[r.T.theme] || THEMES.forest;
     world = {
       backdrop: createBackdrop(theme),
@@ -80,7 +94,10 @@ export function createRenderer(canvas) {
     switch (e.type) {
       case 'jump': fx.dust(r.x, r.y, 4, -1, dust); break;
       case 'land': fx.landing(r.x, r.y, dust, e.hard); if (me && e.hard) cam.shake = Math.max(cam.shake, 3); break;
-      case 'box': fx.shards(e.x, e.y); fx.text(e.x, e.y - 24, me ? '?' : '', '#ffd23f'); break;
+      case 'box': if (me) fx.shards(e.x, e.y); break;
+      case 'climb': fx.dust(r.x + 12, r.y - 10, 3, -1, dust); break;
+      case 'topped': fx.dust(r.x, r.y, 4, 0, dust); break;
+      case 'slide': fx.dust(r.x + 10, r.y, 5, 1, dust); break;
       case 'pad': fx.ring(r.x, r.y - 10, 34, '#ffd23f'); fx.twinkles(r.x, r.y - 10, 5, '#ffe066'); break;
       case 'hit':
         if (e.kind === 'spikes' || e.kind === 'saw' || e.kind === 'trap') fx.sparks(r.x, r.y - 25, '#ffffff', 12);
@@ -167,11 +184,13 @@ export function createRenderer(canvas) {
     for (const d of T.deco) if (LIVE_DECO.has(d.kind) && vis(d.x, 0, 60)) drawDeco(ctx, d, t, theme);
     for (const m of T.mud) if (vis(m.x, m.w)) drawMud(ctx, m, t);
     for (const pd of T.pads) if (vis(pd.x, pd.w)) drawPad(ctx, pd, t);
+    // Boxes as this player sees them (each runner has its own).
     for (const b of T.boxes) {
       if (!vis(b.x)) continue;
+      const tk = b.taken[p.id] || 0;
       const by = floorBelow(T, b.x, b.y);
-      if (b.t <= 0 && by - b.y < 120) shadow(ctx, b.x, by, 13, 0.22);
-      drawBox(ctx, b, t, b.t > 0 ? (b.t < 0.35 ? 1 - b.t / 0.35 : 0) : 1);
+      if (tk <= 0 && by - b.y < 120) shadow(ctx, b.x, by, 13, 0.22);
+      drawBox(ctx, b, t, tk > 0 ? (tk < 0.35 ? 1 - tk / 0.35 : 0) : 1);
     }
     for (const tr of race.traps) if (vis(tr.x)) drawTrap(ctx, tr.x, tr.y, tr.snap > 0 ? Math.min(1, tr.snap * 12) : 0);
     mark('objects');

@@ -9,9 +9,10 @@ import { solidsNear, floorBelow, surfaceAt, slopeAt } from './track.js';
 // Moves the body by its velocity for dt seconds and resolves collisions. Ground strips have
 // sloped tops: a grounded body follows them up (any slope inside a strip is walkable) and
 // sticks to them going down; only a strip's ends act as walls.
-// Returns { blocked, landed, ground } (ground: the solid it stands on, if any).
+// Returns { blocked, landed, ground, wall } (ground: the solid it stands on; wall: { s, top } of
+// a wall it ran into going right).
 export function moveBody(b, dt, T, stepUp = PHYS.stepUp) {
-  const res = { blocked: false, landed: false, ground: null };
+  const res = { blocked: false, landed: false, ground: null, wall: null };
   const hw = b.w / 2;
   const near = solidsNear(T, b.x - hw - 40, b.x + hw + 40);
 
@@ -26,6 +27,7 @@ export function moveBody(b, dt, T, stepUp = PHYS.stepUp) {
       if (b.grounded && b.y - top <= stepUp) { b.y = top; continue; }
       nx = s.x - hw - 0.01;
       res.blocked = true;
+      if (!res.wall || top < res.wall.top) res.wall = { s, top };
     } else if (b.vx < 0 && nx - hw < s.x + s.w && b.x - hw >= s.x + s.w - 0.5) {
       const top = surfaceAt(s, s.x + s.w);
       if (b.y - b.h >= s.y + s.h || b.y <= top + 0.01) continue;
@@ -89,38 +91,77 @@ export function inStrip(list, b) {
   return null;
 }
 
-// One physics step of a runner's own movement: speed, jumping, gravity, collisions.
-// input: { jump (pressed this step), hold (button held) }. Returns the moveBody result plus
-// a `jumped` flag.
+// One physics step of a runner's own movement: speed, jumping, sliding, climbing, gravity,
+// collisions. input: { jump (pressed this step), hold (jump held), duck (EĞİL pressed this step) }.
+// Returns the moveBody result plus `jumped`, `climbing` and `topped` (just climbed over a wall).
 export function stepRunner(r, dt, T, input, topSpeed) {
   if (input.jump) r.jumpBuf = PHYS.buffer;
   else r.jumpBuf = Math.max(0, r.jumpBuf - dt);
   r.coyote = r.grounded ? PHYS.coyote : Math.max(0, r.coyote - dt);
+  const free = r.canJump !== false; // not stunned, race running
 
-  // Uphill is slower, downhill faster.
-  const sl = r.grounded && r.ground ? slopeAt(r.ground, r.x) : 0;
-  r.slope = sl;
-  if (topSpeed > 0) topSpeed *= 1 + Math.max(-0.5, Math.min(0.5, sl)) * 0.4;
-  if (r.vx < topSpeed) r.vx = Math.min(topSpeed, r.vx + PHYS.accel * dt * (r.vx < 80 ? 1.6 : 1));
-  else r.vx = Math.max(topSpeed, r.vx - 1400 * dt);
+  // Climbing a wall: pressed against it, going up; over the top with a little hop forward.
+  if (r.climb) {
+    if (!free) r.climb = null;
+    else {
+      if (input.jump) r.climb.fast = true;
+      r.vx = 40;
+      r.vy = -PHYS.climb * (r.climb.fast || input.hold ? 2 : 1);
+      r.duck = false;
+      r.h = PHYS.h;
+      const res = moveBody(r, dt, T);
+      res.climbing = true;
+      if (!res.blocked || r.y <= r.climb.top + 0.5) {
+        r.climb = null;
+        r.vy = -280;
+        r.vx = 170;
+        r.airJump = false;
+        res.topped = true;
+      }
+      r.ground = res.ground;
+      return res;
+    }
+  }
 
-  // Ducking: a low slide on the ground, a quick drop in the air. Nobody stands up under a roof.
+  // Sliding: one press of EĞİL slides for a moment; in the air it dives first. Nobody stands up
+  // under a roof.
+  if (input.duck && free) {
+    if (r.grounded) r.slideT = PHYS.slideTime;
+    else r.dive = true;
+  }
+  if (r.dive && r.grounded) { r.dive = false; r.slideT = PHYS.slideTime; }
+  if (r.grounded) r.slideT = Math.max(0, (r.slideT || 0) - dt);
   const headroom = !roofAbove(r, T);
-  let duck = (!!input.duck && r.canJump !== false) || (r.duck && !headroom);
+  let duck = (r.slideT > 0 && free) || (r.dive && free) || (r.duck && !headroom);
+
   let jumped = false;
-  if (r.jumpBuf > 0 && r.coyote > 0 && r.canJump !== false && headroom) {
+  if (r.jumpBuf > 0 && r.coyote > 0 && free && headroom) {
     r.vy = -PHYS.jumpV;
     r.grounded = false;
     r.coyote = 0;
     r.jumpBuf = 0;
     r.cut = false;
     r.jumpT = 0;
+    r.airJump = true;
+    r.slideT = 0;
+    r.dive = false;
     jumped = true;
     duck = false;
   }
   r.duck = duck;
   r.h = duck ? PHYS.duckH : PHYS.h;
-  if (duck && input.duck && !r.grounded && r.vy < PHYS.maxFall) r.vy += PHYS.fastFall * dt;
+
+  // Speed: uphill slower, downhill faster; jumps and slides cost a little speed.
+  const sl = r.grounded && r.ground ? slopeAt(r.ground, r.x) : 0;
+  r.slope = sl;
+  if (topSpeed > 0) {
+    topSpeed *= 1 + Math.max(-0.5, Math.min(0.5, sl)) * 0.4;
+    if (r.airJump || duck) topSpeed *= PHYS.moveSlow;
+  }
+  if (r.vx < topSpeed) r.vx = Math.min(topSpeed, r.vx + PHYS.accel * dt * (r.vx < 80 ? 1.6 : 1));
+  else r.vx = Math.max(topSpeed, r.vx - (r.grounded ? 1400 : PHYS.airDecel) * dt);
+
+  if (r.dive && !r.grounded && r.vy < PHYS.maxFall) r.vy += PHYS.fastFall * dt;
   r.jumpT = (r.jumpT || 0) + dt;
   if (!input.hold && r.vy < 0 && !r.cut && r.jumpT >= PHYS.minHold) {
     r.vy *= PHYS.jumpCut;
@@ -129,7 +170,20 @@ export function stepRunner(r, dt, T, input, topSpeed) {
   r.vy = Math.min(PHYS.maxFall, r.vy + PHYS.gravity * dt);
   const res = moveBody(r, dt, T);
   r.ground = res.ground;
+  if (r.grounded) r.airJump = false;
   res.jumped = jumped;
+
+  // Ran into a wall that isn't too tall (and isn't a low roof): grab it and climb.
+  if (res.blocked && res.wall && res.wall.s.kind !== 'roof' && free && !duck) {
+    const rise = r.y - res.wall.top;
+    if (rise > 0 && rise <= PHYS.climbReach) {
+      r.climb = { top: res.wall.top, fast: false };
+      r.vy = 0;
+      r.slideT = 0;
+      r.dive = false;
+      res.startClimb = true;
+    }
+  }
   return res;
 }
 
@@ -146,14 +200,15 @@ export function roofAbove(r, T) {
 
 // "What happens if I keep running / jump right now?" for the bots.
 // Returns { danger, t } where danger is null, 'pit', 'wall' or 'spikes' and t the time it shows up.
-// duck: hold the duck button the whole time (to see whether sliding gets under a roof).
+// duck: press EĞİL right now (to see whether sliding gets under a roof).
+// A wall counts as danger even though runners can climb it: jumping over is faster.
 export function simulate(r, T, topSpeed, jumpNow, horizon, dt = 1 / 60, duck = false) {
-  const b = { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut, duck: r.duck };
+  const b = { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut, duck: r.duck, slideT: r.slideT || 0, dive: r.dive, airJump: r.airJump, climb: null };
   let airborne = false;
   for (let t = 0; t < horizon; t += dt) {
-    const res = stepRunner(b, dt, T, { jump: jumpNow && t === 0, hold: true, duck }, topSpeed);
+    const res = stepRunner(b, dt, T, { jump: jumpNow && t === 0, hold: true, duck: duck && t === 0 }, topSpeed);
     if (res.jumped) airborne = true;
-    if (res.blocked) return { danger: 'wall', t, x: b.x };
+    if (res.blocked || res.climbing) return { danger: 'wall', t, x: b.x };
     if (onSpikes(b, T)) return { danger: 'spikes', t, x: b.x };
     if (!b.grounded && floorBelow(T, b.x, b.y) === Infinity) {
       // Over a pit: only a problem if we are already falling into it.

@@ -20,6 +20,7 @@ const states = [
   { name: 'kazandı', r: { vx: 0, grounded: true, finished: true } },
   { name: 'kay', r: { vx: 300, grounded: true, duck: true } },
   { name: 'top', r: { vx: 300, vy: 500, grounded: false, duck: true } },
+  { name: 'tırman', r: { vx: 40, vy: -240, grounded: false, climb: { top: 0 }, climbPhase: 0.2 } },
 ];
 const c = document.getElementById('c');
 const ids = (q.get('ids') || ANIMALS.map((a) => a.id).join(',')).split(',');

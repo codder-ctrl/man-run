@@ -438,7 +438,8 @@ function cobblePattern(g, colors, mortar, cw, chh, seed, s) {
 function cobbles(g, f, x0, x1, y1, colors, mortar, below, cw = 30, chh = 24, seed = 0) {
   const m = g.getTransform();
   const s = Math.hypot(m.a, m.b) || 1;
-  g.fillStyle = cobblePattern(g, colors, mortar, cw, chh, seed, Math.min(2, Math.round(s * 4) / 4));
+  // Never 0: a hidden page can report a zero-size canvas.
+  g.fillStyle = cobblePattern(g, colors, mortar, cw, chh, seed, Math.max(0.25, Math.min(2, Math.round(s * 4) / 4)));
   const top = Math.min(f(x0), f(x1), f((x0 + x1) / 2)) - 200;
   g.fillRect(x0, top, x1 - x0, y1 - top);
 }
