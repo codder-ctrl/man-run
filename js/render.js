@@ -1,7 +1,7 @@
 // Draws the race: camera, layered world, runners, items and effects. Turns race events into
 // effects (dust, shards, bolts, shake, hit-stop).
 
-import { VIEW_H, ABILITIES, AIMED_ITEMS, ITEMS } from './config.js';
+import { VIEW_H, ABILITIES, AIMED_ITEMS, ITEMS, SAW_R, TRAP_SCALE } from './config.js';
 import { predictItemPath } from './game.js';
 import { floorBelow } from './track.js';
 import { predictBurst } from './physics.js';
@@ -118,6 +118,7 @@ export function createRenderer(canvas) {
         break;
       }
       case 'sawBreak': fx.sparks(e.x, e.y, '#ffffff', 16); fx.pow(e.x, e.y, '#ffffff'); break;
+      case 'sawBounce': fx.sparks(e.x, e.y, '#ffd23f', 14); fx.ring(e.x, e.y, 30, '#ffffff', 0.25); break;
       case 'trap': fx.sparks(e.x, e.y - 6, '#e0e6ec', 12); break;
       case 'anvil': fx.landing(e.x, e.y, dust, true); if (race.runners[e.id] === race.player) cam.shake = 14; break;
       case 'fall': break;
@@ -194,7 +195,37 @@ export function createRenderer(canvas) {
       if (tk <= 0 && by - b.y < 120) shadow(ctx, b.x, by, 13, 0.22);
       drawBox(ctx, b, t, tk > 0 ? (tk < 0.35 ? 1 - tk / 0.35 : 0) : 1);
     }
-    for (const tr of race.traps) if (vis(tr.x)) drawTrap(ctx, tr.x, tr.y, tr.snap > 0 ? Math.min(1, tr.snap * 12) : 0);
+    // Traps as this player sees them: open with a red danger rim until they catch *you*, then
+    // shut and gone (each runner gets caught by a trap once; the others still see it set).
+    for (const tr of race.traps) {
+      if (!vis(tr.x)) continue;
+      const at0 = tr.caught ? tr.caught[p.id] : undefined;
+      const age = at0 === undefined ? -1 : race.time - at0;
+      if (age > 1.6) continue;
+      const fade = age > 1.2 ? 1 - (age - 1.2) / 0.4 : 1;
+      ctx.globalAlpha = fade;
+      if (age < 0 && tr.owner !== p.id) {
+        const pulse = 0.75 + Math.sin(t * 8 + tr.id) * 0.25;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        glow(ctx, tr.x, tr.y - 6, 40, '#ff3b4a', 0.35 * pulse);
+        ctx.restore();
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = rgba('#ff3b4a', 0.85);
+        ctx.beginPath();
+        ctx.ellipse(tr.x, tr.y - 4, 28, 9, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (age < 0) {
+        // Your own trap: a calmer outline (it can't catch you).
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = rgba('#ff3b4a', 0.45);
+        ctx.beginPath();
+        ctx.ellipse(tr.x, tr.y - 4, 26, 8, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      drawTrap(ctx, tr.x, tr.y, age >= 0 ? Math.min(1, age * 12) : 0, TRAP_SCALE);
+      ctx.globalAlpha = 1;
+    }
     mark('objects');
 
     // Name tags that would overlap stack upward.
@@ -209,13 +240,15 @@ export function createRenderer(canvas) {
     for (const r of order) if (r.dead <= 0 && vis(r.x)) drawRunner(r, t, r === p, dt);
 
     for (const sw of race.saws) {
+      const cy = sw.y - SAW_R * 0.92;
+      const back = Math.sign(sw.vx || 1);
       for (let k = 3; k >= 1; k--) {
         ctx.globalAlpha = 0.18 * (4 - k) / 3;
-        drawSaw(ctx, sw.x - k * 9, sw.y - 11, 12, sw.spin - k * 0.4);
+        drawSaw(ctx, sw.x - back * k * 16, cy, SAW_R, sw.spin - k * 0.4);
       }
       ctx.globalAlpha = 1;
-      drawSaw(ctx, sw.x, sw.y - 11, 12, sw.spin);
-      if (sw.grounded) fx.grind(sw.x - 6, sw.y - 1, -1);
+      drawSaw(ctx, sw.x, cy, SAW_R, sw.spin);
+      if (sw.grounded) fx.grind(sw.x - back * 14, sw.y - 1, -back);
     }
     for (const a of race.anvils) drawAnvilDrop(a, t);
     // The aiming player's own arrow and predicted path: only on this screen.

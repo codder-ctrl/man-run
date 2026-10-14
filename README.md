@@ -21,8 +21,8 @@ Your animal runs by itself. You only decide when to jump, slide and use your ite
 
 - **Jumping and sliding cost speed:** in the air after a jump and while sliding, your top speed drops to 80%. Don't jump for nothing.
 - **Slide:** one tap slides for a moment, then you stand up by yourself; under a low rock roof you stay down until you're out. Tapped in the air, it dives straight down and slides on landing.
-- **Climb:** run into a wall and you grab it and climb; hold jump to climb twice as fast. Miss a ledge by a little and you hang on and pull yourself up. Low rock roofs can't be climbed, only slid under.
-- **Blue paw, aimed like a Brawl Stars super:** the 🐾 button fills up over 15 seconds. When it glows, hold it and drag your thumb to aim, all the way round: an arrow and a dotted path show where you'll go (only on your screen), while everyone sees your animal raise a glowing paw in that direction. Let go and you burst that way, then keep the speed boost. Aim up to fly over walls and pits, forward for a ground dash, down in the air to dive. A quick tap dashes straight ahead. Each animal has its own dash:
+- **Climb:** touch any upright wall in the air and you stick to it. Each jump kicks you a jump's height up the wall and you grab on again; stop jumping and you slowly slide down. Keep jumping and you get over the top. Low rock roofs can't be climbed, only slid under.
+- **Blue paw, aimed like a Brawl Stars super:** the 🐾 button fills up over 15 seconds. When it glows, hold it and drag your thumb to aim, all the way round: an arrow and a dotted path show where you'll go (only on your screen), while everyone sees your animal raise a glowing paw in that direction. Let go and you burst that way, then keep the speed boost. Aim up to fly over walls, forward for a ground dash, down in the air to dive. A quick tap dashes straight ahead. Each animal has its own dash:
   - Tilki: Tilki Atılışı, short but very fast
   - Ayı: Ayı Gücü, long and strong
   - Tavşan: Tavşan Sıçrayışı, nimble
@@ -34,8 +34,8 @@ Your animal runs by itself. You only decide when to jump, slide and use your ite
 - **Items** (the last runners get the strongest ones):
   - ⚡ Şimşek: zaps everyone (they turn into x-ray skeletons for a moment)
   - 🛡️ Kalkan: blocks attacks and spikes
-  - 🪚 Testere: thrown any way you aim (even back at a chaser), then rolls along, hopping walls, and knocks down the first runner it hits
-  - 🐻 Kapan: a bear trap dropped behind you, or thrown where you aim; it never catches its owner
+  - 🪚 Testere: a big saw thrown any way you aim (even back at a chaser); it rolls along, bounces back off upright walls and knocks down the first runner it hits
+  - 🐻 Kapan: a big bear trap dropped behind you, or thrown where you aim. Like the boxes it works for each runner on their own: it catches everyone who steps in it once, not just the first, and never its owner. Traps set by someone else have a thick red rim
   - 💨 Hız: a few seconds of top speed
   - 🔨 Örs: drops on the leader's head after a red "!" warning
 - **Track:** one unbroken path, nothing to fall into. Speed pads speed you up, mud slows you down, spikes stun you, walls and steps are jumped or climbed, low rock roofs are slid under, and wooden boardwalks give an upper route.

@@ -113,34 +113,46 @@ export function startBurst(r, angle, speed) {
   r.h = PHYS.h;
 }
 
-// One physics step of a runner's own movement: speed, jumping, sliding, climbing, gravity,
+// One physics step of a runner's own movement: speed, jumping, sliding, wall climbing, gravity,
 // collisions. input: { jump (pressed this step), hold (jump held), duck (EĞİL pressed this step) }.
-// Returns the moveBody result plus `jumped`, `climbing` and `topped` (just climbed over a wall).
+// Returns the moveBody result plus `jumped`, `climbing`, `startClimb` and `topped` (just got over
+// the top of a wall).
 export function stepRunner(r, dt, T, input, topSpeed) {
   if (input.jump) r.jumpBuf = PHYS.buffer;
   else r.jumpBuf = Math.max(0, r.jumpBuf - dt);
   r.coyote = r.grounded ? PHYS.coyote : Math.max(0, r.coyote - dt);
   const free = r.canJump !== false; // not stunned, race running
 
-  // Climbing a wall: pressed against it, going up; over the top with a little hop forward.
+  // Clinging to a wall (the user's design): touch any upright wall in the air and you stick to it.
+  // Every jump kicks you a jump's height up the wall, where you grab on again; stop jumping and
+  // you slide slowly down. Clear the top and you hop forward onto it; reach the floor and you let go.
   if (r.climb) {
     if (!free) r.climb = null;
     else {
-      if (input.jump) r.climb.fast = true;
-      r.vx = 40;
-      r.vy = -PHYS.climb * (r.climb.fast || input.hold ? 2 : 1);
+      let jumped = false;
+      if (r.jumpBuf > 0) {
+        r.vy = -PHYS.jumpV;
+        r.jumpBuf = 0;
+        jumped = true;
+      }
+      if (r.vy < 0) r.vy += PHYS.gravity * dt; // rising after a kick: a normal jump arc
+      else r.vy = Math.min(PHYS.wallSlide, r.vy + PHYS.gravity * dt * 0.5); // sliding down slowly
+      r.vx = 60; // pressed against the wall
       r.duck = false;
       r.h = PHYS.h;
+      r.airJump = false;
       const res = moveBody(r, dt, T);
       res.climbing = true;
-      if (!res.blocked || r.y <= r.climb.top + 0.5) {
-        r.climb = null;
-        r.vy = -280;
-        r.vx = 170;
-        r.airJump = false;
-        res.topped = true;
-      }
+      res.jumped = jumped;
       r.ground = res.ground;
+      if (!res.blocked) {
+        r.climb = null;
+        r.vx = 180;
+        r.vy = Math.min(r.vy, -160);
+        res.topped = true;
+      } else if (r.grounded) {
+        r.climb = null;
+      }
       return res;
     }
   }
@@ -161,10 +173,7 @@ export function stepRunner(r, dt, T, input, topSpeed) {
       if (B.t <= 0 || res.blocked || hitCeiling || landed) {
         r.burst = null;
         r.vy = B.vy < 0 && !hitCeiling ? B.vy * 0.5 : r.vy;
-        if (res.blocked && res.wall && res.wall.s.kind !== 'roof') {
-          const rise = r.y - res.wall.top;
-          if (rise > 0 && rise <= PHYS.climbReach) { r.climb = { top: res.wall.top, fast: true }; r.vy = 0; res.startClimb = true; }
-        }
+        if (res.blocked && res.wall && !r.grounded) { r.climb = { top: res.wall.top }; r.vy = Math.min(r.vy, 0); res.startClimb = true; }
       }
       r.ground = res.ground;
       return res;
@@ -221,16 +230,13 @@ export function stepRunner(r, dt, T, input, topSpeed) {
   if (r.grounded) r.airJump = false;
   res.jumped = jumped;
 
-  // Ran into a wall that isn't too tall (and isn't a low roof): grab it and climb.
-  if (res.blocked && res.wall && res.wall.s.kind !== 'roof' && free && !duck) {
-    const rise = r.y - res.wall.top;
-    if (rise > 0 && rise <= PHYS.climbReach) {
-      r.climb = { top: res.wall.top, fast: false };
-      r.vy = 0;
-      r.slideT = 0;
-      r.dive = false;
-      res.startClimb = true;
-    }
+  // Ran into an upright wall in the air: stick to it (a rising jump keeps rising).
+  if (res.blocked && res.wall && free && !duck && !r.grounded) {
+    r.climb = { top: res.wall.top };
+    if (r.vy > PHYS.wallSlide) r.vy = PHYS.wallSlide;
+    r.slideT = 0;
+    r.dive = false;
+    res.startClimb = true;
   }
   return res;
 }

@@ -148,8 +148,8 @@ function buildMenu() {
   const desc = {
     lightning: 'Herkesi çarpar, sersemletir',
     shield: 'Saldırılardan ve dikenlerden korur',
-    saw: 'Öne fırlar, ilk çarptığını devirir',
-    trap: 'Arkana bırakılır, basan takılır',
+    saw: 'Atılır, duvardan seker, çarptığını devirir',
+    trap: 'Basan herkes bir kez takılır',
     speed: 'Kısa süre çok hızlı koşarsın',
     anvil: 'Öndekinin kafasına düşer',
   };
@@ -354,6 +354,7 @@ function handleEvent(e) {
       break;
     case 'blocked': if (me || near) sfx('blocked'); break;
     case 'sawBreak': if (near) sfx('sawBreak'); break;
+    case 'sawBounce': if (Math.abs(e.x - race.player.x) < 700) sfx('sawBreak'); break;
     case 'trap': if (me || near) sfx('trap'); break;
     case 'pad': if (me) sfx('pad'); break;
     case 'paw': if (me || near) sfx('paw'); break;

@@ -9,7 +9,7 @@
 //             (other runners, bots, saws, boxes, places) is copied from the host's snapshots.
 // Runner control (r.ctrl): 'local' (this phone's input), 'bot', 'remote'.
 
-import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, TRAP_THROW, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
+import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, SAW_R, TRAP_SCALE, TRAP_THROW, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
 import { buildTrack, respawnAt, rng, floorBelow } from './track.js';
 import { stepRunner, moveBody, onSpikes, inStrip, startBurst } from './physics.js';
 import { createBot } from './ai.js';
@@ -137,11 +137,16 @@ function makeSaw(race, r, angle) {
   const dir = Math.cos(a) >= 0 ? 1 : -1;
   const push = dir > 0 ? Math.max(0, r.vx) : 0;
   const speed = SAW_SPEED + push;
-  return { id: race.nextId++, x: r.x + 26 * Math.cos(a), y: r.y - 2 - Math.max(0, Math.sin(a)) * 20, vx: Math.cos(a) * speed, vy: -Math.sin(a) * speed * 0.85, speed, dir, rollOn: angle === null || angle === undefined || Math.abs(Math.sin(a)) < 0.2, w: 22, h: 22, grounded: false, owner: r.id, life: SAW_LIFE, spin: 0 };
+  const size = SAW_R * 1.85;
+  return { id: race.nextId++, x: r.x + (SAW_R + 16) * Math.cos(a), y: r.y - 2 - Math.max(0, Math.sin(a)) * 20, vx: Math.cos(a) * speed, vy: -Math.sin(a) * speed * 0.85, speed, dir, rollOn: angle === null || angle === undefined || Math.abs(Math.sin(a)) < 0.2, w: size, h: size, grounded: false, owner: r.id, life: SAW_LIFE, spin: 0, bounces: 0 };
 }
+// Traps are per runner, like the boxes: catching one runner doesn't spring it for the others
+// (caught[runnerId] = race time it caught them). It never catches its owner.
 function makeTrap(race, r, angle) {
-  if (angle === null || angle === undefined) return { id: race.nextId++, x: r.x - 30, y: r.y, vx: 0, vy: 0, w: 30, h: 10, grounded: false, owner: r.id, armed: 0.4, snap: 0, victim: -1 };
-  return { id: race.nextId++, x: r.x, y: r.y - 30, vx: Math.cos(angle) * TRAP_THROW + Math.max(0, r.vx) * 0.5, vy: -Math.sin(angle) * TRAP_THROW - 140, w: 30, h: 10, grounded: false, owner: r.id, armed: 0.4, snap: 0, victim: -1, thrown: true };
+  const w = 30 * TRAP_SCALE;
+  const h = 10 * TRAP_SCALE;
+  if (angle === null || angle === undefined) return { id: race.nextId++, x: r.x - 34, y: r.y, vx: 0, vy: 0, w, h, grounded: false, owner: r.id, caught: {} };
+  return { id: race.nextId++, x: r.x, y: r.y - 30, vx: Math.cos(angle) * TRAP_THROW + Math.max(0, r.vx) * 0.5, vy: -Math.sin(angle) * TRAP_THROW - 140, w, h, grounded: false, owner: r.id, caught: {}, thrown: true };
 }
 
 export function useItem(race, r, angle = null) {
@@ -318,14 +323,15 @@ function updateSaws(race, dt) {
   const T = race.T;
   for (const s of race.saws) {
     s.life -= dt;
-    stepSaw(s, dt, T);
+    const res = stepSaw(s, dt, T);
+    if (res.bounced) emit(race, 'sawBounce', { x: s.x + s.dir * -s.w / 2, y: s.y - s.h / 2 });
     if (s.y > T.lowest + 400) s.life = 0;
     for (const r of race.runners) {
       if (r.id === s.owner || r.dead > 0 || r.finished || s.life <= 0) continue;
       if (Math.abs(r.x - s.x) < (r.w + s.w) / 2 && s.y > r.y - r.h && s.y - s.h < r.y) {
         hit(race, r, 'saw', race.runners[s.owner]);
         s.life = 0;
-        emit(race, 'sawBreak', { x: s.x, y: s.y - 11 });
+        emit(race, 'sawBreak', { x: s.x, y: s.y - s.h / 2 });
       }
     }
   }
@@ -340,12 +346,14 @@ export function stepSaw(s, dt, T) {
   const wasGrounded = s.grounded;
   const res = moveBody(s, dt, T, 14);
   if (s.grounded && (!wasGrounded || s.rollOn)) { s.vx = (s.dir || 1) * s.speed; s.rollOn = true; }
-  if (res.blocked || (s.dir < 0 && s.vx === 0 && s.grounded)) {
-    // Hops over walls and steps (gives up after a while).
-    s.vx = (s.dir || 1) * s.speed;
-    if (s.grounded) s.vy = -680;
-    s.hops = (s.hops || 0) + 1;
-    if (s.hops > 40) s.life = 0;
+  if (res.blocked) {
+    // An upright wall bounces it back the way it came (with a little hop).
+    s.dir = -(s.dir || 1);
+    s.vx = s.dir * s.speed;
+    if (s.grounded) s.vy = -260;
+    s.bounces = (s.bounces || 0) + 1;
+    res.bounced = true;
+    if (s.bounces > 6) s.life = 0;
   }
   return res;
 }
@@ -361,12 +369,13 @@ export function stepTrap(t, dt, T) {
 // The path an aimed saw or trap would take (the aiming player's private preview).
 export function predictItemPath(race, r, item, angle, seconds = 0.9, dt = 1 / 60, every = 3) {
   const o = item === 'saw' ? makeSaw({ nextId: 0 }, r, angle) : makeTrap({ nextId: 0 }, r, angle);
-  const pts = [[o.x, o.y - (item === 'saw' ? 11 : 4)]];
+  const lift = item === 'saw' ? o.h / 2 : 4;
+  const pts = [[o.x, o.y - lift]];
   let i = 0;
   for (let t = 0; t < seconds; t += dt) {
     if (item === 'saw') stepSaw(o, dt, race.T);
     else { stepTrap(o, dt, race.T); if (o.grounded) { pts.push([o.x, o.y - 4]); break; } }
-    if (++i % every === 0) pts.push([o.x, o.y - (item === 'saw' ? 11 : 4)]);
+    if (++i % every === 0) pts.push([o.x, o.y - lift]);
     if (o.y > race.T.lowest + 300) break;
   }
   return pts;
@@ -375,19 +384,16 @@ export function predictItemPath(race, r, item, angle, seconds = 0.9, dt = 1 / 60
 function updateTraps(race, dt) {
   const T = race.T;
   for (const t of race.traps) {
-    t.armed = Math.max(0, t.armed - dt);
     if (!t.grounded) {
       stepTrap(t, dt, T);
       if (t.y > T.lowest + 400) t.gone = true;
       if (t.thrown && !t.grounded) continue; // in flight: harmless until it lands
     }
-    if (t.snap > 0) { t.snap += dt; if (t.snap > 1.6) t.gone = true; continue; }
     for (const r of race.runners) {
       if (r.dead > 0 || r.finished) continue;
-      if (r.id === t.owner) continue; // your own trap never catches you
-      if (Math.abs(r.x - t.x) < 22 && Math.abs(r.y - t.y) < 14) {
-        t.snap = 0.001;
-        t.victim = r.id;
+      if (r.id === t.owner || t.caught[r.id] !== undefined) continue; // never its owner, once each
+      if (Math.abs(r.x - t.x) < 22 * TRAP_SCALE && Math.abs(r.y - t.y) < 14 * TRAP_SCALE) {
+        t.caught[r.id] = race.time;
         if (hit(race, r, 'trap', race.runners[t.owner], { x: t.x })) {
           r.x = t.x;
           r.vx = 0;
@@ -395,7 +401,6 @@ function updateTraps(race, dt) {
           if (fy < Infinity) { r.y = fy; r.vy = 0; r.grounded = true; }
         }
         emit(race, 'trap', { id: r.id, x: t.x, y: t.y });
-        break;
       }
     }
   }

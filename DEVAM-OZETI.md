@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.8.0** (çayır dünyası, patika, çukursuz harita). v0.6–v0.8 için puan verilmedi; kullanıcının telefonda denemesi bekleniyor.
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.8.0** (çayır dünyası, patika, çukursuz harita). Yerelde hazır: **v0.9.0** (duvara yapışıp zıplayarak tırmanma, büyük seken testere, büyük kişiye özel kapan; 'yükle' bekleniyor).
 
 ## Proje
 
@@ -54,6 +54,15 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.8.0** (çayır dünyası, pati
 | 5 | 6 | 7 | 7 | 5,5 |
 
 - **Akıcılık hâlâ 5:** Sürekli tekrarlanan şikâyet "Fun Run kadar akıcı değil, mekanikler gelişmeli". Sıradaki geliştirme turunda öncelik bu olmalı; kullanıcıya neyin akıcı gelmediğini somut sor.
+
+**v0.8.0, kullanıcının puanları** (2026-10-14):
+
+| Akıcılık | Grafik | Efektler | Ses | Oynanış |
+|---|---|---|---|---|
+| 6 | 7 | 7 | 6 | 6,5 |
+
+- **Oynanış notu:** Duvara tırmanma hâlâ eksikti. Karakter nerede olursa olsun dik duvara değince yapışmalı, her zıplayışta bir zıplama boyu çıkıp yeniden tutunmalı, zıplamazsa yavaş yavaş aşağı kaymalı. v0.9.0'da yapıldı.
+- Ayrıca istenenler (v0.9.0'da yapıldı): testere 2,5 kat büyük ve dik duvardan geri seksin; kapan 1,5 kat büyük; oyuncunun attığı kapanın etrafında kalın kırmızı çizgi; kapanlar kutular gibi herkese ayrı çalışsın.
 
 **Sıra (kullanıcı, 2026-10-13):** Önce arkadaşlarla oynanabilir hale getirmek, sonra oyunu geliştirmek (eğilme, mavi pati, akıcılık).
 
@@ -136,7 +145,7 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.8.0** (çayır dünyası, pati
 
 ## v0.5.0'da olanlar (kullanıcının istekleri, 2026-10-14)
 
-- **Duvara tırmanma:**
+- **Duvara tırmanma** (v0.9.0'da yerine yapışıp zıplayarak tırmanma geldi):
   - Duvara çarpan karakter tutunup tırmanır, tepede küçük bir sıçrayışla üstüne çıkar.
   - Zıplamayı basılı tutarsan iki kat hızlı tırmanır.
   - Çukurun karşı kenarını az farkla kaçırırsan kenara tutunur.
@@ -203,6 +212,22 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.8.0** (çayır dünyası, pati
   - Havadaki toprak parçaları direkli ahşap iskele oldu.
   - Çalılar ve ağaçlar patikanın arka kenarında duruyor.
 - **Hata düzeltmesi:** Kapana yakalanan karakter yokuşta kapanın yerine çekilince ayakları zeminin içinde kalıyordu ve zeminden aşağı "düşüyordu". Önceki sürümlerde çukura düşme sanılan düşüşlerin bir kısmı buydu. Artık karakter zeminin üstüne konuyor; ayrıca zeminin içine giren her şey yukarı çıkarılıyor. Botların düşme sayısı her pistte 0 oldu.
+
+## v0.9.0'da olanlar (kullanıcının v0.8 notları, yerelde hazır)
+
+- **Duvara yapışma ve zıplayarak tırmanma:**
+  - Havadayken dik bir duvara (taş blok, basamak, yüksek kenar) değen karakter duvara yapışır.
+  - Her zıplayışta bir zıplama boyu yukarı çıkar, yavaşlayınca yeniden tutunur.
+  - Zıplamazsa saniyede 70 birim hızla yavaş yavaş aşağı kayar; yere inince bırakır.
+  - Tepeyi geçince üstüne atlar. Mavi patiyle duvara çarpınca da yapışır.
+  - Görünüş: kayarken patiler yukarıda duvarı kavrar, bacaklar sarkar; zıplarken tırmanma hareketi.
+  - Botlar da duvarda zıplayarak tırmanıyor.
+- **Testere:** 2,5 kat büyük; dik duvara çarpınca geri seker (en fazla 6 kez), sekerken kıvılcım ve ses çıkar.
+- **Kapan:**
+  - 1,5 kat büyük.
+  - Başkasının kurduğu kapanın etrafında kalın kırmızı halka ve kırmızı parıltı var; kendi kapanında ince bir çizgi.
+  - Kutular gibi herkese ayrı çalışıyor: herkesi bir kez yakalar, biri takıldı diye kapan kaybolmaz. Seni yakaladıktan sonra senin ekranında solup kaybolur, diğerleri için yerinde durur.
+- **Yardım ekranı ve README** yeni tırmanmaya ve eşyalara göre güncellendi.
 
 ## Öğrenilenler
 

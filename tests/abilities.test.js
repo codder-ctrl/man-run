@@ -7,8 +7,8 @@ import { STEP } from '../js/config.js';
 
 const UP = Math.PI / 2;
 
-function freshRace() {
-  const race = createRace({ seed: 7, theme: 'forest' });
+function freshRace(seed = 7) {
+  const race = createRace({ seed, theme: 'forest' });
   while (race.phase !== 'race') stepRace(race, STEP);
   const p = race.player;
   for (let i = 0; i < 120; i++) stepRace(race, STEP); // get running
@@ -104,4 +104,90 @@ test('EĞİL is a tap: the slide ends by itself', () => {
   assert.ok(p.duck, 'sliding right after the tap');
   for (let t = 0; t < 1; t += STEP) stepRace(race, STEP);
   assert.ok(!p.duck || roofAbove(p, race.T), 'standing again after a second (unless under a roof)');
+});
+
+// A race whose track has a stone wall, and its first wall.
+function wallRace() {
+  for (let seed = 1; seed < 200; seed++) {
+    const race = freshRace(seed);
+    const wall = race.T.solids.find((s) => s.kind === 'block' && s.x > 600 && s.h > 50);
+    if (wall) return { race, wall };
+  }
+  throw new Error('no wall found');
+}
+
+// A runner placed against a wall in the air, for the climbing tests.
+function atWall(race, wall) {
+  const p = race.player;
+  p.x = wall.x - p.w / 2 - 1;
+  p.y = wall.y + wall.h - 20; // in the air, below the wall top
+  p.vx = 300;
+  p.vy = 0;
+  p.grounded = false;
+  return wall;
+}
+
+test('touching a wall in the air sticks to it and slides down slowly', () => {
+  const { race, wall } = wallRace();
+  const p = race.player;
+  atWall(race, wall);
+  stepRace(race, STEP);
+  assert.ok(p.climb, 'clinging after touching the wall');
+  const y0 = p.y;
+  for (let t = 0; t < 0.25; t += STEP) stepRace(race, STEP);
+  const slid = p.y - y0;
+  assert.ok(p.climb || p.grounded, 'still on the wall or down at its foot');
+  assert.ok(slid >= 0 && slid < 30, `slides slowly (${slid.toFixed(1)} units in 0.25 s)`);
+});
+
+test('each jump kicks a jump height up the wall and over the top', () => {
+  const { race, wall } = wallRace();
+  const p = race.player;
+  atWall(race, wall);
+  stepRace(race, STEP);
+  let topped = false;
+  for (let t = 0; t < 2.5 && !topped; t += STEP) {
+    stepRace(race, STEP, { jump: p.climb && p.vy >= 0, hold: true });
+    if (p.x > wall.x + 4 && p.y <= wall.y + 1) topped = true;
+  }
+  assert.ok(topped, 'climbed over the wall by jumping');
+});
+
+test('big saws bounce back off upright walls', () => {
+  const { race, wall } = wallRace();
+  const p = race.player;
+  p.x = wall.x - 150;
+  p.item = 'saw';
+  useItem(race, p, 0);
+  const saw = race.saws[0];
+  assert.ok(saw.w > 50, 'the saw is big');
+  saw.x = wall.x - 120;
+  saw.y = wall.y + wall.h;
+  let bounced = false;
+  for (let t = 0; t < 1 && race.saws.length; t += STEP) {
+    stepRace(race, STEP);
+    if (race.saws[0] && race.saws[0].vx < 0) bounced = true;
+  }
+  assert.ok(bounced, 'it came back off the wall');
+});
+
+test('a trap catches every runner once, not just the first', () => {
+  const race = createRace({ seed: 7, theme: 'forest', allBots: true });
+  while (race.phase !== 'race') stepRace(race, STEP);
+  const [owner, a, b] = race.runners;
+  owner.item = 'trap';
+  useItem(race, owner, null);
+  const trap = race.traps[0];
+  for (let t = 0; t < 0.3; t += STEP) stepRace(race, STEP); // let it settle
+  for (const r of [a, b]) {
+    r.x = trap.x;
+    r.y = trap.y;
+    r.vy = 0;
+    r.grounded = true;
+    r.shield = 0;
+    stepRace(race, STEP);
+  }
+  assert.ok(trap.caught[a.id] !== undefined && trap.caught[b.id] !== undefined, 'both runners were caught');
+  assert.equal(race.traps.length, 1, 'the trap is still there for the others');
+  assert.equal(trap.caught[owner.id], undefined, 'never its owner');
 });

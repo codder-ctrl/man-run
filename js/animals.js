@@ -71,8 +71,16 @@ function basePose(r, t) {
     return p;
   }
 
+  if (r.climb && r.vy >= 0) {
+    // Clinging to the wall: both paws up gripping, legs dangling, sliding slowly down.
+    const sway = Math.sin(t * 3) * 0.08;
+    p.armF = -2.75 + sway; p.armB = -2.55 - sway; p.elbF = 0.35; p.elbB = 0.35;
+    p.legF = -0.25 + sway; p.kneeF = 0.5; p.legB = 0.15 - sway; p.kneeB = 0.6;
+    p.lean = 0.12; p.look = 0.7; p.mouth = 3; p.head = -0.3; p.tail = -0.6; p.bob = 0;
+    return p;
+  }
   if (r.climb) {
-    // Climbing: hands over hands, feet pushing, looking up at the top.
+    // Kicking up the wall: hands over hands, feet pushing, looking up at the top.
     const ph = (r.climbPhase || 0) * TAU;
     const s = Math.sin(ph);
     p.armF = -2.9 + s * 0.45; p.armB = -2.6 - s * 0.45; p.elbF = 0.5; p.elbB = 0.5;
@@ -379,7 +387,7 @@ function drawTrapOn(ctx, x, y) {
 }
 
 // A bear trap at (x, y) on the ground; snap 0 = open, 1 = shut.
-export function drawTrap(ctx, x, y, snap = 0) {
+export function drawTrap(ctx, x, y, snap = 0, scale = 1) {
   at(ctx, x, y, 0, () => {
     blob(ctx, ellipse(0, -1.5, 15, 3.4), '#6d747d', { ow: 1.6, depth: 1.2 });
     const open = 1 - snap;
@@ -393,7 +401,7 @@ export function drawTrap(ctx, x, y, snap = 0) {
     // Teeth.
     for (let i = -2; i <= 2; i++) flat(ctx, poly([[i * 4 - 1.6, -3], [i * 4, -7 - open * 2], [i * 4 + 1.6, -3]]), '#e7ecf1');
     blob(ctx, circle(0, -2, 2.6), '#8a929b', { ow: 1.3, depth: 0.8 });
-  });
+  }, scale, scale);
 }
 
 // Small head-only portrait for the HUD and menus.

@@ -46,7 +46,8 @@ export function createHostSync(race, peers, send) {
         AIM_KINDS.indexOf(r.aimKind),
       ]),
       sw: race.saws.map((s) => [s.id, r1(s.x), r1(s.y), Math.round(s.vx), s.grounded ? 1 : 0]),
-      tr: race.traps.map((t) => [t.id, r1(t.x), r1(t.y), r2(t.snap)]),
+      // Traps: which runners each one has caught, as bits (they're per runner, like boxes).
+      tr: race.traps.map((t) => [t.id, r1(t.x), r1(t.y), Object.keys(t.caught).reduce((m, k) => m | (1 << +k), 0), t.owner]),
       an: race.anvils.map((a) => [a.id, a.target, r2(a.t), a.warn, a.fall, r1(a.x), r1(a.y), a.done ? 1 : 0]),
       ev: pending,
     };
@@ -140,7 +141,12 @@ export function createGuestSync(race, send) {
       const old = race.saws.find((o) => o.id === id);
       return { id, x, y, vx, grounded: !!g, spin: old ? old.spin : 0 };
     });
-    race.traps = s.tr.map(([id, x, y, snap]) => ({ id, x, y, snap }));
+    race.traps = s.tr.map(([id, x, y, mask, owner]) => {
+      const old = race.traps.find((o) => o.id === id);
+      const caught = { ...(old ? old.caught : {}) };
+      for (let i = 0; i < race.runners.length; i++) if (mask & (1 << i) && caught[i] === undefined) caught[i] = race.time;
+      return { id, x, y, owner, caught, grounded: true };
+    });
     race.anvils = s.an.map(([id, target, t, warn, fall, x, y, done]) => ({ id, target, t, warn, fall, x, y, done: !!done }));
     for (const e of s.ev) handleEvent(e);
   }

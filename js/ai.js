@@ -88,7 +88,13 @@ export function createBot(r, skill, R) {
   }
 
   function decide(race) {
-    if (r.dead > 0 || r.stun > 0 || r.climb || r.burst || !r.grounded && r.coyote <= 0) return;
+    if (r.dead > 0 || r.stun > 0 || r.burst) return;
+    if (r.climb) {
+      // Stuck to a wall after a missed jump: keep kicking up it (not every tick, like a person).
+      if (race.phase === 'race' && r.vy >= -100 && R() < skill.react * 0.7) { pressJump = true; holdT = 0.3; }
+      return;
+    }
+    if (!r.grounded && r.coyote <= 0) return;
     if (race.phase !== 'race') return;
     const T = race.T;
     let top = (r.boost > 0 || r.pad > 0 ? PHYS.boost : r.inMud && r.dash <= 0 ? PHYS.mud : PHYS.run) * bot.speedMul;
