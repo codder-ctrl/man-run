@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.7.0** (360° nişan, bas-bekle-bırak eşyalar, daha yüksek hız). v0.6 için puan verilmedi; kullanıcının telefonda denemesi bekleniyor.
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.7.0**. Yerelde hazır: **v0.8.0** (çayır dünyası, patika, çukursuz harita; "yükle" bekleniyor). v0.6/v0.7 için puan verilmedi.
 
 ## Proje
 
@@ -182,6 +182,27 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.7.0** (360° nişan, bas-bekle
   - Pati yetenekleri, testere ve tırmanma da hızlandı.
   - Kamera biraz uzaklaştı (görüş 430 → 450), pist 15000 → 16500 uzadı.
   - Yarışlar şimdi yaklaşık 45-58 saniye.
+
+## v0.8.0'da olanlar (dünyanın görüntüsü, kullanıcının isteği)
+
+- **Kullanıcının sözleri:** "Aşağısı toprak gibi durmasın, çimler ekranın en altına kadar gelsin, perspektifle bize doğru gelsin. Yol yeşil değil, sarı-beyaz arası patika olsun. Haritada aşağı düşme kopukluğu olmasın, tüm haritalar için."
+- **Toprak kesiti kalktı:** Dünya artık hafif yukarıdan bakılan bir çayır:
+  - Arkada tepe çizgisine yükselen, uzaklaştıkça puslanan bir çayır var.
+  - Ortada koşulan açık renk patika var: çakıllar, iki tekerlek izi, kenarlarına taşan çimen.
+  - Önde ekranın altına kadar inen çayır var; aşağı doğru otlar büyüyor ve koyulaşıyor, satırlar birbirinin üstüne biniyor.
+- **Haritalar:**
+  - Orman: yeşil çiçekli çayır, kumlu patika.
+  - Karlı Dağ: karlı çayır, çiğnenmiş kar patikası (kenarda kar yığınları).
+  - Çöl: kuru altın otlar, açık kum patikası.
+- **Çukur yok:**
+  - Pist baştan sona kesintisiz; çukur, çift çukur, uçan ada ve hız oku + çukur parçaları çıkarıldı.
+  - Yerlerine hız oku + duvar parçası ve boşluksuz büyük basamak geldi.
+  - Testte her pistte zemin uç uca kontrol ediliyor.
+- **Diğer görsel değişiklikler:**
+  - Basamaklarda taş istinat duvarı var.
+  - Havadaki toprak parçaları direkli ahşap iskele oldu.
+  - Çalılar ve ağaçlar patikanın arka kenarında duruyor.
+- **Hata düzeltmesi:** Kapana yakalanan karakter yokuşta kapanın yerine çekilince ayakları zeminin içinde kalıyordu ve zeminden aşağı "düşüyordu". Önceki sürümlerde çukura düşme sanılan düşüşlerin bir kısmı buydu. Artık karakter zeminin üstüne konuyor; ayrıca zeminin içine giren her şey yukarı çıkarılıyor. Botların düşme sayısı her pistte 0 oldu.
 
 ## Öğrenilenler
 

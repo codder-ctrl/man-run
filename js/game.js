@@ -10,7 +10,7 @@
 // Runner control (r.ctrl): 'local' (this phone's input), 'bot', 'remote'.
 
 import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, TRAP_THROW, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
-import { buildTrack, respawnAt, rng } from './track.js';
+import { buildTrack, respawnAt, rng, floorBelow } from './track.js';
 import { stepRunner, moveBody, onSpikes, inStrip, startBurst } from './physics.js';
 import { createBot } from './ai.js';
 
@@ -388,7 +388,12 @@ function updateTraps(race, dt) {
       if (Math.abs(r.x - t.x) < 22 && Math.abs(r.y - t.y) < 14) {
         t.snap = 0.001;
         t.victim = r.id;
-        if (hit(race, r, 'trap', race.runners[t.owner], { x: t.x })) { r.x = t.x; r.vx = 0; }
+        if (hit(race, r, 'trap', race.runners[t.owner], { x: t.x })) {
+          r.x = t.x;
+          r.vx = 0;
+          const fy = floorBelow(T, r.x, r.y - 60);
+          if (fy < Infinity) { r.y = fy; r.vy = 0; r.grounded = true; }
+        }
         emit(race, 'trap', { id: r.id, x: t.x, y: t.y });
         break;
       }

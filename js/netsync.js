@@ -10,6 +10,7 @@ import { ITEM_IDS, SHIELD_TIME, SPEED_TIME } from './config.js';
 
 const AIM_KINDS = ['paw', ...ITEM_IDS];
 import { applyHit, makeBot } from './game.js';
+import { floorBelow } from './track.js';
 
 const SNAP_EVERY = 0.05;
 const REPORT_EVERY = 1 / 30;
@@ -149,7 +150,12 @@ export function createGuestSync(race, send) {
     if (e.id === me.id) {
       if (e.type === 'hit') {
         applyHit(me, e.kind);
-        if (e.kind === 'trap' && e.x !== undefined) { me.x = e.x; me.vx = 0; }
+        if (e.kind === 'trap' && e.x !== undefined) {
+          me.x = e.x;
+          me.vx = 0;
+          const fy = floorBelow(race.T, me.x, me.y - 60);
+          if (fy < Infinity) { me.y = fy; me.vy = 0; me.grounded = true; }
+        }
       } else if (e.type === 'use') {
         if (e.item === 'shield') me.shield = SHIELD_TIME;
         if (e.item === 'speed') { me.boost = SPEED_TIME; me.stun = 0; }

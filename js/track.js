@@ -86,9 +86,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
     }
     x += n * DX;
   };
-  const gap = (w) => { endPiece(); x += Math.round(w); startPiece(); };
   const cliff = (dy) => { endPiece(); gy += Math.round(dy); startPiece(); };
-  const gapDown = (w, dy) => { endPiece(); x += Math.round(w); gy += Math.round(dy); startPiece(); };
 
   const respawn = () => T.respawns.push({ x: x + 30, y: gy });
   const box = (bx, by) => T.boxes.push({ x: bx, y: by, taken: {}, id: T.boxes.length });
@@ -147,31 +145,6 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       run(rnd(240, 320), y0);
       run(60);
       sprinkle(s, x);
-    },
-    hillPit(d) {
-      // Run down a slope straight into a pit: jump at full speed.
-      respawn();
-      run(80);
-      run(rnd(240, 300), clampY(gy + rnd(50, 90)));
-      run(rnd(30, 60));
-      gap(rnd(90, 110 + d * 32));
-      run(rnd(160, 220));
-    },
-    pit(d) {
-      respawn();
-      const s = x;
-      run(rnd(120, 180));
-      sprinkle(s, x - 40);
-      gap(rnd(80, 100 + d * 45)); // jumps cost speed: 145 is the widest
-      run(rnd(140, 200));
-    },
-    doublePit(d) {
-      respawn();
-      run(rnd(110, 150));
-      gap(rnd(80, 100 + d * 25));
-      run(rnd(70, 110));
-      gap(rnd(80, 100 + d * 25));
-      run(rnd(140, 180));
     },
     stepUp(d) {
       if (gy < -240) return SEG.stepDown(d);
@@ -232,18 +205,6 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       run(sw);
       run(rnd(200, 260));
     },
-    island(d) {
-      respawn();
-      run(rnd(120, 160));
-      const pw = rnd(250, 300 + d * 40);
-      const pl = rnd(100, 130);
-      const px = x + (pw - pl) / 2;
-      const py = gy - rnd(30, 60);
-      T.solids.push({ x: px, y: py, w: pl, h: 18, kind: 'plat' });
-      if (R() < 0.5) box(px + pl / 2, py - 34);
-      gap(pw);
-      run(rnd(160, 220));
-    },
     upper() {
       // Lower route with spikes or mud, an earthen ledge route above with boxes.
       respawn();
@@ -282,20 +243,25 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
       bumps(rnd(360, 480), rnd(18, 30), 2);
       sprinkle(s, x);
     },
-    padJump(d) {
-      respawn();
-      run(rnd(140, 180));
-      T.pads.push({ x, y: gy, w: 70 });
-      run(rnd(110, 130));
-      gap(rnd(150, 170 + d * 20));
-      run(rnd(200, 260));
-    },
     drop() {
+      // A big step down (no gap to fall into).
       if (gy > 110) return SEG.hillUp();
       respawn();
       run(rnd(120, 160));
-      gapDown(rnd(60, 90), rnd(110, 150));
+      cliff(rnd(110, 150));
       run(rnd(260, 340));
+    },
+    padWall(d) {
+      // Speed pad, then a wall to time the jump over at full speed.
+      respawn();
+      run(rnd(140, 180));
+      T.pads.push({ x, y: gy, w: 70 });
+      run(rnd(200, 240));
+      const w = 50;
+      const h = Math.round(rnd(56, 70 + d * 16));
+      T.solids.push({ x, y: gy - h, w, h, kind: 'block' });
+      run(w);
+      run(rnd(220, 280));
     },
     duck() {
       // A low rock overhang: too tall to jump over, slide under it.
@@ -316,8 +282,10 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
     },
   };
 
-  const easy = ['flat', 'rolling', 'rolling', 'hillUp', 'hillDown', 'hillUp', 'hillDown', 'valley', 'pit', 'stepUp', 'stepDown', 'wall', 'spikes', 'boxes', 'pad', 'mud', 'duck'];
-  const hard = ['pit', 'doublePit', 'hillPit', 'stairs', 'wall', 'wallSpikes', 'spikes', 'island', 'upper', 'padJump', 'drop', 'hillUp', 'hillDown', 'valley', 'rolling', 'mud', 'duck'];
+  // No pits (the user asked for a track with nothing to fall into): the obstacles are walls,
+  // steps, spikes, mud, low roofs and ledge routes on an unbroken path.
+  const easy = ['flat', 'rolling', 'rolling', 'hillUp', 'hillDown', 'hillUp', 'hillDown', 'valley', 'stepUp', 'stepDown', 'wall', 'spikes', 'boxes', 'pad', 'mud', 'duck'];
+  const hard = ['stairs', 'wall', 'wallSpikes', 'spikes', 'upper', 'padWall', 'drop', 'hillUp', 'hillDown', 'valley', 'rolling', 'mud', 'duck', 'stepUp', 'wallSpikes'];
 
   // Start line area (the ground reaches back off screen behind the start).
   run(700);
@@ -339,7 +307,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
     }
     let name;
     do { name = pick(R() < 0.75 - d * 0.5 ? easy : hard); } while (name === prev || (name === 'boxes' && x - lastBox < 500));
-    if (name === 'boxes' || name === 'upper' || name === 'island' || name === 'valley') lastBox = x;
+    if (name === 'boxes' || name === 'upper' || name === 'valley') lastBox = x;
     SEG[name](d);
     prev = name;
   }
@@ -366,7 +334,7 @@ export function buildTrack(seed, { length = 15000, theme = 'forest' } = {}) {
   for (const b of T.boxes) if (b.y === null) b.y = floorBelow(T, b.x, -Infinity) - 34;
   for (const d of T.deco) {
     const g = groundAt(T, d.x);
-    d.y = g ? surfaceAt(g, d.x) : Infinity;
+    d.y = g ? surfaceAt(g, d.x) - 8 : Infinity; // on the far edge of the path, behind it
     d.slope = slopeAt(g, d.x);
   }
   const blocks = T.solids.filter((s) => s.kind === 'block' || s.kind === 'roof');

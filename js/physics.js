@@ -50,7 +50,10 @@ export function moveBody(b, dt, T, stepUp = PHYS.stepUp) {
     for (const s of near) {
       if (b.x + hw <= s.x || b.x - hw >= s.x + s.w) continue;
       const top = surfaceAt(s, b.x);
-      const tol = s.ys ? slopeTol : 0.5;
+      // Ground strips are solid all the way down: feet that ended up inside one (pulled back by a
+      // trap on a slope, say) are lifted back onto it instead of sinking through.
+      const inside = s.ys && b.x >= s.x && b.x <= s.x + s.w;
+      const tol = s.ys ? (inside ? Math.max(slopeTol, 80) : slopeTol) : 0.5;
       if (b.y <= top + tol && ny + (s.ys ? snap : 0) >= top && top < land) { land = top; res.ground = s; }
     }
     if (land < Infinity) {

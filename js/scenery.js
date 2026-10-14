@@ -7,7 +7,7 @@
 // The static track is painted once into 512-unit-wide chunk canvases and reused every frame.
 
 import { blob, line, flat, glow, at, ellipse, circle, roundRect, poly, scallop, smooth, star, INK, darker, lighter, rgba, mix } from './paint.js';
-import { rng, surfaceAt, backAt, solidsNear } from './track.js';
+import { rng, surfaceAt, backAt, solidsNear, floorBelow } from './track.js';
 import { THEMES } from './themes.js';
 
 const TAU = Math.PI * 2;
@@ -358,15 +358,19 @@ export function createTerrain(T, theme) {
 }
 
 function paintChunk(g, T, th, view) {
-  drawBackWall(g, T, th, view);
+  drawBackMeadow(g, T, th, view);
   for (const d of T.deco) if (d.kind === 'tree' && d.x > view.x0 - 140 && d.x < view.x1 + 140) drawTree(g, d, th);
-  const near = solidsNear(T, view.x0 - 60, view.x1 + 60);
-  for (const s of near) if (s.kind === 'ground') drawGround(g, s, th, view);
-  for (const s of near) if (s.kind === 'block') drawBlock(g, s, th);
-  for (const s of near) if (s.kind === 'plat') drawLedge(g, s, th);
-  for (const s of near) if (s.kind === 'roof') drawRoof(g, s, th);
-  for (const sp of T.spikes) if (sp.x + sp.w > view.x0 - 20 && sp.x < view.x1 + 20) drawSpikes(g, sp);
+  // Bushes, rocks and signs stand on the far edge of the path, behind it.
   for (const d of T.deco) if (STATIC_DECO.has(d.kind) && d.x > view.x0 - 80 && d.x < view.x1 + 80) drawDeco(g, d, 0, th);
+  const near = solidsNear(T, view.x0 - 60, view.x1 + 60);
+  const grounds = near.filter((q) => q.kind === 'ground').sort((a, b) => a.x - b.x);
+  for (const q of grounds) drawMeadow(g, q, th, view);
+  for (const q of grounds) drawPath(g, q, th, view);
+  drawSteps(g, grounds, th);
+  for (const q of near) if (q.kind === 'plat') drawBoardwalk(g, q, T, th);
+  for (const q of near) if (q.kind === 'block') drawBlock(g, q, th);
+  for (const q of near) if (q.kind === 'roof') drawRoof(g, q, th);
+  for (const sp of T.spikes) if (sp.x + sp.w > view.x0 - 20 && sp.x < view.x1 + 20) drawSpikes(g, sp);
 }
 
 // Path along a height function from x0 to x1, then down to `bottom`.
@@ -444,87 +448,324 @@ function cobbles(g, f, x0, x1, y1, colors, mortar, below, cw = 30, chh = 24, see
   g.fillRect(x0, top, x1 - x0, y1 - top);
 }
 
-// Darkening bands that follow the surface, so the ground gets darker deeper down.
-function depthBands(g, f, x0, x1, bottom, color, bands) {
-  for (const [off, a] of bands) {
-    g.beginPath();
-    terrainPath(g, (x) => f(x) + off + Math.sin(x * 0.03) * 4, x0, x1, bottom, 16);
-    g.fillStyle = rgba(color, a);
-    g.fill();
+// ---- The meadow world (v0.8) ----
+// Seen a little from above: a back field rising to the hill line, the path the runners use, and a
+// near field that comes toward the viewer down to the bottom of the screen. Fields are painted in
+// rows that follow the path's curve; each row uses the same grass texture at a bigger scale than
+// the one behind it and overlaps it with a ragged grass edge, which reads as perspective.
+
+// tint: [color, alpha] baked into the tile (haze far away, shade up close), so each row is a single
+// pattern fill.
+const grassTiles = new Map();
+function grassTile(th, kind, tint = null) {
+  const key = th.id + kind + (tint ? tint.join() : '');
+  let tile = grassTiles.get(key);
+  if (tile) return tile;
+  const TW = 128;
+  const TH = 64;
+  const px = 2;
+  const c = document.createElement('canvas');
+  c.width = TW * px;
+  c.height = TH * px;
+  const t = c.getContext('2d');
+  t.scale(px, px);
+  const M = kind === 'hill' ? { ...th.meadow, ...th.hill, base: th.hill.base, blade: th.hill.blade, bladeLight: th.hill.light, dark: th.hill.dark } : th.meadow;
+  t.fillStyle = M.base;
+  t.fillRect(0, 0, TW, TH);
+  const R = rng(kind === 'hill' ? 71 : 37);
+  const snow = th.id === 'snow';
+  // Soft patches of lighter and darker ground.
+  for (let i = 0; i < 14; i++) {
+    const x = R() * TW;
+    const y = R() * TH;
+    for (const dx of [-TW, 0, TW]) for (const dy of [-TH, 0, TH]) {
+      t.fillStyle = rgba(i % 2 ? M.bladeLight : M.dark, snow ? 0.08 : 0.12);
+      t.beginPath();
+      t.ellipse(x + dx, y + dy, 14 + R() * 10, 5 + R() * 4, 0, 0, TAU);
+      t.fill();
+    }
   }
+  // Grass tufts (snow: mostly sparkles with a few dark tips).
+  const tufts = snow ? 26 : 110;
+  for (let i = 0; i < tufts; i++) {
+    const x = R() * TW;
+    const y = R() * TH;
+    const h = 3 + R() * 4;
+    const col = [M.blade, M.bladeLight, M.dark][Math.floor(R() * 3)];
+    for (const dx of [-TW, 0, TW]) for (const dy of [-TH, 0, TH]) {
+      t.strokeStyle = col;
+      t.lineWidth = 1.1;
+      t.lineCap = 'round';
+      t.beginPath();
+      t.moveTo(x + dx - 1.5, y + dy);
+      t.lineTo(x + dx - 2.5, y + dy - h * 0.8);
+      t.moveTo(x + dx, y + dy);
+      t.lineTo(x + dx + 0.3, y + dy - h);
+      t.moveTo(x + dx + 1.5, y + dy);
+      t.lineTo(x + dx + 2.6, y + dy - h * 0.75);
+      t.stroke();
+    }
+  }
+  if (snow) {
+    for (let i = 0; i < 40; i++) {
+      const x = R() * TW;
+      const y = R() * TH;
+      t.fillStyle = i % 3 ? '#ffffff' : '#cfe4fa';
+      t.fillRect(x, y, 1.2, 1.2);
+    }
+  }
+  // A few flowers in the near field.
+  if (kind === 'front') {
+    for (let i = 0; i < 7; i++) {
+      const x = R() * TW;
+      const y = R() * TH;
+      t.fillStyle = M.accent[i % M.accent.length];
+      t.beginPath();
+      t.arc(x, y, 1.3, 0, TAU);
+      t.fill();
+    }
+  }
+  if (tint && tint[1] > 0) {
+    t.fillStyle = rgba(tint[0], tint[1]);
+    t.fillRect(0, 0, TW, TH);
+  }
+  tile = { c, TW, TH };
+  grassTiles.set(key, tile);
+  return tile;
 }
 
-function drawBackWall(g, T, th, view) {
+function grassPattern(g, tile, scale, squash) {
+  const pat = g.createPattern(tile.c, 'repeat');
+  if (pat.setTransform) pat.setTransform(new DOMMatrix().scale((scale * tile.TW) / tile.c.width, (scale * squash * tile.TH) / tile.c.height));
+  return pat;
+}
+
+// A row between f(x) + top and f(x) + bottom (bottom null = down to `floor`), with a ragged grass
+// edge of `tooth` units along its top.
+function rowPath(g, f, x0, x1, top, bottom, floor, tooth = 0) {
+  g.beginPath();
+  if (tooth > 0) {
+    const w = Math.max(3, tooth * 1.2);
+    g.moveTo(x0, f(x0) + top);
+    let up = false;
+    for (let x = x0; x <= x1 + w; x += w / 2) {
+      const xx = Math.min(x, x1);
+      const k = Math.sin(xx * 12.9898) * 43758.5453;
+      const jitter = (k - Math.floor(k)) * 0.6 + 0.4;
+      g.lineTo(xx, f(xx) + top - (up ? tooth * jitter : 0));
+      up = !up;
+      if (xx === x1) break;
+    }
+  } else {
+    g.moveTo(x0, f(x0) + top);
+    for (let x = x0; x < x1; x += 8) g.lineTo(x, f(x) + top);
+    g.lineTo(x1, f(x1) + top);
+  }
+  if (bottom === null) {
+    g.lineTo(x1, floor);
+    g.lineTo(x0, floor);
+  } else {
+    for (let x = x1; x > x0; x -= 8) g.lineTo(x, f(x) + bottom);
+    g.lineTo(x0, f(x0) + bottom);
+  }
+  g.closePath();
+}
+
+// The back field: from the hill line down behind the path, getting hazier toward the top.
+const BACK_ROWS = [0, 22, 50, 92, 150, 240, 380];
+function drawBackMeadow(g, T, th, view) {
   const f = (x) => backAt(T, x);
   const x0 = view.x0 - 10;
   const x1 = view.x1 + 10;
-  const bottom = view.y1 + 10;
-  g.save();
-  g.beginPath();
-  terrainPath(g, f, x0, x1, bottom, 16);
-  g.fillStyle = th.back.face;
+  const floor = view.y1 + 10;
+  const H = th.hill;
+  for (let i = 0; i < BACK_ROWS.length; i++) {
+    const k = i / (BACK_ROWS.length - 1);
+    // The last row stops where the near field takes over (no point painting under it).
+    rowPath(g, f, x0, x1, BACK_ROWS[i], i < BACK_ROWS.length - 1 ? BACK_ROWS[i + 1] + 4 : 460, floor, i ? 2 + k * 2 : 0);
+    const tint = [th.meadow.haze, Math.round((0.42 - k * 0.3) * 20) / 20];
+    g.fillStyle = grassPattern(g, grassTile(th, 'hill', tint), 0.32 + k * 0.32, 0.45 + k * 0.25);
+    g.fill();
+  }
+  // The hill line, with a soft ragged edge.
+  rowPath(g, f, x0, x1, -3, 6, floor, 3);
+  g.fillStyle = H.light;
   g.fill();
-  g.clip();
-  cobbles(g, f, x0, x1, bottom, [th.back.stone, mix(th.back.stone, th.back.face, 0.5)], th.back.stoneDark, 14, 38, 28, 99);
-  depthBands(g, f, x0, x1, bottom, th.back.deep, [[70, 0.16], [150, 0.2], [250, 0.26], [380, 0.32]]);
-  // Atmospheric haze pushes the wall back behind the lane.
-  g.fillStyle = rgba(th.back.haze, th.back.hazeA ?? 0.36);
-  g.fillRect(x0, view.y0, x1 - x0, bottom - view.y0);
-  g.restore();
-  // Top lip.
+  g.lineWidth = 1.6;
+  g.strokeStyle = rgba(INK, 0.28);
   g.beginPath();
-  g.moveTo(x0, f(x0) - 5);
-  for (let x = x0; x <= x1; x += 16) g.lineTo(x, f(x) - 5);
-  for (let x = x1; x >= x0; x -= 12) g.lineTo(x, f(x) + 9 + Math.sin(x * 0.35) * 2.5);
-  g.closePath();
-  g.fillStyle = th.back.top;
-  g.fill();
-  g.lineWidth = 2;
-  g.strokeStyle = rgba(INK, 0.4);
+  for (let x = x0; x <= x1; x += 8) (x === x0 ? g.moveTo : g.lineTo).call(g, x, f(x) - 2);
   g.stroke();
-  // Dark shrubs on the back ridge.
+  // Shrubs along the hill line.
   for (let cx = Math.floor(x0 / 90) * 90; cx < x1; cx += 90) {
     const R = rng(cx * 31 + 5);
     if (R() < 0.45) continue;
     const bx = cx + R() * 80;
-    const by = f(bx) - 2;
-    const s = 0.7 + R() * 0.7;
-    blob(g, scallop(bx, by - 9 * s, 24 * s, 13 * s, 7, 0.45, R), th.back.top, { ow: 1.6, ink: rgba(INK, 0.5), depth: 3, shade: darker(th.back.top, 0.25), light: th.back.topLight });
+    const by = f(bx) - 1;
+    const sz = 0.6 + R() * 0.6;
+    blob(g, scallop(bx, by - 8 * sz, 22 * sz, 11 * sz, 7, 0.45, R), H.dark, { ow: 1.4, ink: rgba(INK, 0.35), depth: 3, shade: darker(H.dark, 0.2), light: H.base });
   }
 }
 
-export function drawGround(g, s, th, view) {
+// The near field: rows from just under the path down to the bottom of the screen, growing with
+// nearness (bigger blades, deeper color) like grass coming toward you.
+const FRONT_ROWS = [17, 28, 43, 63, 91, 129, 181, 253, 353];
+function drawMeadow(g, s, th, view) {
   const f = (x) => surfaceAt(s, x);
   const x0 = Math.max(s.x, view.x0 - 20);
   const x1 = Math.min(s.x + s.w, view.x1 + 20);
   if (x1 <= x0) return;
-  const bottom = view.y1 + 10;
-  const leftEdge = x0 === s.x;
-  const rightEdge = x1 === s.x + s.w;
-  const D = th.dirt;
-
-  g.save();
-  g.beginPath();
-  terrainPath(g, f, x0, x1, bottom);
-  g.fillStyle = D.base;
+  const floor = view.y1 + 10;
+  const M = th.meadow;
+  const n = FRONT_ROWS.length;
+  for (let i = 0; i < n; i++) {
+    const k = i / (n - 1);
+    const sc = 0.42 + k * k * 2.1;
+    rowPath(g, f, x0, x1, FRONT_ROWS[i], i < n - 1 ? FRONT_ROWS[i + 1] + 2 : null, floor, i ? 2.5 + k * 9 : 0);
+    const tint = k < 0.45 ? [M.haze, 0.3 * (1 - k / 0.45)] : [M.dark, 0.26 * ((k - 0.45) / 0.55)];
+    tint[1] = Math.round(tint[1] * 20) / 20;
+    g.fillStyle = grassPattern(g, grassTile(th, 'front', tint), sc, 0.5 + k * 0.4);
+    g.fill();
+  }
+  // The path's soft shadow on the grass right under it.
+  rowPath(g, f, x0, x1, 16, 24, floor, 0);
+  g.fillStyle = rgba(M.dark, 0.22);
   g.fill();
-  g.clip();
-  cobbles(g, f, x0, x1, bottom, [D.stoneA, D.stoneB, D.stoneC], D.mortar, 16);
-  depthBands(g, f, x0, x1, bottom, D.deep, [[55, 0.1], [110, 0.14], [175, 0.18], [250, 0.24], [340, 0.3]]);
-  // Shadow cast by the grass lip.
-  g.beginPath();
-  terrainPath(g, f, x0, x1, bottom, 8, 8);
-  g.fillStyle = rgba(D.deep, 0.22);
+}
+
+// The path: a flat, light band the runners stand in the middle of (feet at f(x), the far edge 9
+// above, the near edge 18 below), with ruts and pebbles, grass spilling over both edges.
+const pathTiles = new Map();
+function pathTile(th) {
+  let tile = pathTiles.get(th.id);
+  if (tile) return tile;
+  const TW = 96;
+  const TH = 32;
+  const px = 2;
+  const c = document.createElement('canvas');
+  c.width = TW * px;
+  c.height = TH * px;
+  const t = c.getContext('2d');
+  t.scale(px, px);
+  const P = th.path;
+  t.fillStyle = P.base;
+  t.fillRect(0, 0, TW, TH);
+  const R = rng(13);
+  for (let i = 0; i < 30; i++) {
+    const x = R() * TW;
+    const y = R() * TH;
+    const r = 0.6 + R() * 1.3;
+    for (const dx of [-TW, 0, TW]) for (const dy of [-TH, 0, TH]) {
+      t.fillStyle = i % 4 ? P.pebble : P.light;
+      t.beginPath();
+      t.ellipse(x + dx, y + dy, r * 1.4, r, 0, 0, TAU);
+      t.fill();
+    }
+  }
+  for (let i = 0; i < 10; i++) {
+    const x = R() * TW;
+    const y = R() * TH;
+    for (const dx of [-TW, 0, TW]) {
+      t.fillStyle = rgba(P.edge, 0.12);
+      t.beginPath();
+      t.ellipse(x + dx, y, 10 + R() * 8, 2, 0, 0, TAU);
+      t.fill();
+    }
+  }
+  tile = { c, TW, TH };
+  pathTiles.set(th.id, tile);
+  return tile;
+}
+
+function drawPath(g, s, th, view) {
+  const f = (x) => surfaceAt(s, x);
+  const x0 = Math.max(s.x, view.x0 - 20);
+  const x1 = Math.min(s.x + s.w, view.x1 + 20);
+  if (x1 <= x0) return;
+  const P = th.path;
+  const M = th.meadow;
+  const floor = view.y1 + 10;
+  rowPath(g, f, x0, x1, -9, 18, floor, 0);
+  const tile = pathTile(th);
+  g.fillStyle = grassPattern(g, tile, 1, 1);
   g.fill();
-  g.restore();
+  // Lighter far half (it faces the sky more), slightly darker near edge.
+  rowPath(g, f, x0, x1, -9, -1, floor, 0);
+  g.fillStyle = rgba(P.light, 0.55);
+  g.fill();
+  rowPath(g, f, x0, x1, 12, 18, floor, 0);
+  g.fillStyle = rgba(P.edge, 0.22);
+  g.fill();
+  // Two faint ruts.
+  g.lineWidth = 1.4;
+  g.strokeStyle = rgba(P.edge, 0.35);
+  for (const off of [2, 9.5]) {
+    g.beginPath();
+    for (let x = x0; x <= x1; x += 8) (x === x0 ? g.moveTo : g.lineTo).call(g, x, f(x) + off);
+    g.stroke();
+  }
+  // Edges: grass (or snow) spilling over the far and the near side.
+  const snow = th.id === 'snow';
+  const fringe = (off, h, colA, colB, seed) => {
+    if (snow) {
+      g.fillStyle = colA;
+      g.beginPath();
+      for (let x = x0; x <= x1; x += 9) {
+        const k = Math.sin((x + seed) * 7.13) * 0.5 + 0.5;
+        g.moveTo(x + 5, f(x) + off);
+        g.ellipse(x, f(x) + off, 5, 1.5 + k * h * 0.4, 0, 0, TAU);
+      }
+      g.fill();
+      return;
+    }
+    for (const [col, phase] of [[colA, 0], [colB, 3]]) {
+      g.strokeStyle = col;
+      g.lineWidth = 1.5;
+      g.lineCap = 'round';
+      g.beginPath();
+      for (let x = x0 + phase; x <= x1; x += 6) {
+        const k = Math.sin((x + seed) * 12.9898) * 43758.5453;
+        const j = k - Math.floor(k);
+        const y = f(x) + off;
+        g.moveTo(x, y);
+        g.lineTo(x - 1.5 + j * 3, y - h * (0.5 + j * 0.6));
+      }
+      g.stroke();
+    }
+  };
+  fringe(-8, 6, th.hill.blade, th.hill.dark, 1);
+  g.lineWidth = 1.4;
+  g.strokeStyle = rgba(P.edge, 0.6);
+  g.beginPath();
+  for (let x = x0; x <= x1; x += 8) (x === x0 ? g.moveTo : g.lineTo).call(g, x, f(x) + 17.5);
+  g.stroke();
+  fringe(20, 8, M.blade, M.bladeLight, 7);
+}
 
-  // Cliff sides.
-  g.lineWidth = 3;
-  g.strokeStyle = INK;
-  if (leftEdge) { g.beginPath(); g.moveTo(x0, f(x0) + 4); g.lineTo(x0, bottom); g.stroke(); }
-  if (rightEdge) { g.beginPath(); g.moveTo(x1, f(x1) + 4); g.lineTo(x1, bottom); g.stroke(); }
-
-  drawCap(g, f, leftEdge ? x0 - 6 : x0, rightEdge ? x1 + 6 : x1, th, leftEdge, rightEdge, s.x * 13 + s.w);
+// Where the path steps up or down: a short stone retaining wall over the seam.
+function drawSteps(g, grounds, th) {
+  for (let i = 1; i < grounds.length; i++) {
+    const A = grounds[i - 1];
+    const B = grounds[i];
+    if (Math.abs(A.x + A.w - B.x) > 1) continue;
+    const x = B.x;
+    const ya = surfaceAt(A, x);
+    const yb = surfaceAt(B, x);
+    if (Math.abs(ya - yb) < 3) continue;
+    const top = Math.min(ya, yb) - 9;
+    const bottom = Math.max(ya, yb) + 28;
+    const w = 20;
+    const body = roundRect(x - w / 2, top, w, bottom - top, 6);
+    blob(g, body, th.block.base, { ow: 2.2, depth: 3 });
+    g.save();
+    g.beginPath();
+    body(g);
+    g.clip();
+    cobbles(g, () => top - 100, x - w / 2, x + w / 2, bottom, [th.block.base, lighter(th.block.base, 0.15), darker(th.block.base, 0.12)], th.block.seam, -100, 14, 12, 5);
+    g.restore();
+    line(g, body, INK, 2.2);
+    drawCap(g, () => top + 3, x - w / 2 - 3, x + w / 2 + 3, th, true, true, x);
+  }
 }
 
 // The grass (or snow, or sand) lip on top of a surface.
@@ -670,21 +911,24 @@ function drawRoof(g, s, th) {
   line(g, (c) => { c.moveTo(sx - 6, ground - 50); c.lineTo(sx, ground - 42); c.lineTo(sx + 6, ground - 50); }, INK, 3);
 }
 
-// One-way ledge: a thick slab of earth with a lip, tapering underneath.
-function drawLedge(g, s, th) {
-  const D = th.dirt;
-  const body = smooth([[s.x + 2, s.y + 4], [s.x + s.w - 2, s.y + 4], [s.x + s.w - 6, s.y + 22], [s.x + s.w * 0.7, s.y + 36], [s.x + s.w * 0.3, s.y + 38], [s.x + 6, s.y + 22]], 0.8);
-  blob(g, body, D.base, { ow: 2.3, depth: 4, shade: D.deep });
-  g.save();
+// One-way ledge: a wooden boardwalk on posts that stand on the far edge of the path below.
+function drawBoardwalk(g, s, T, th) {
+  const wood = th.id === 'snow' ? '#a77b52' : th.id === 'desert' ? '#b07a44' : '#b9824c';
+  const posts = [s.x + 8, s.x + s.w / 2, s.x + s.w - 8];
+  for (const px of posts) {
+    const fy = floorBelow(T, px, s.y + 20);
+    if (fy === Infinity) continue;
+    const y1 = fy - 8;
+    blob(g, roundRect(px - 4, s.y + 6, 8, y1 - s.y - 6, 2), darker(wood, 0.25), { ow: 1.8, depth: 1.5 });
+  }
+  const deck = roundRect(s.x - 4, s.y - 5, s.w + 8, 13, 4);
+  blob(g, deck, wood, { ow: 2.3, depth: 3, shade: darker(wood, 0.3), light: lighter(wood, 0.3) });
+  g.strokeStyle = rgba(INK, 0.35);
+  g.lineWidth = 1.4;
   g.beginPath();
-  body(g);
-  g.clip();
-  cobbles(g, () => s.y, s.x, s.x + s.w, s.y + 40, [D.stoneA, D.stoneB, D.stoneC], D.mortar, 8, 26, 18, 3);
-  g.fillStyle = rgba(D.deep, 0.3);
-  g.fillRect(s.x, s.y + 24, s.w, 20);
-  g.restore();
-  line(g, body, INK, 2.3);
-  drawCap(g, () => s.y + 2, s.x - 5, s.x + s.w + 5, th, true, true, s.x);
+  for (let x = s.x + 14; x < s.x + s.w - 4; x += 16) { g.moveTo(x, s.y - 3); g.lineTo(x, s.y + 6); }
+  g.stroke();
+  if (th.id === 'snow') blob(g, roundRect(s.x - 3, s.y - 8, s.w + 6, 5, 2.5), '#ffffff', { ow: 1.4, depth: 1, light: false, shade: '#d4e3f2' });
 }
 
 export function drawSpikes(ctx, sp) {

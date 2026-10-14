@@ -1,6 +1,6 @@
 # Man Run
 
-A Fun Run–style animal race for the browser, built phone-first. Four chibi animals dash across hilly, layered 2.5D tracks; you jump, slide, climb and throw items from "?" boxes to reach the flag first, against bots or against your friends' phones. Plain HTML, CSS and JavaScript (ES modules), no build step and no dependencies. UI text is Turkish.
+A Fun Run–style animal race for the browser, built phone-first. Four chibi animals dash along a winding path through hilly meadows seen a little from above; you jump, slide, climb and throw items from "?" boxes to reach the flag first, against bots or against your friends' phones. Plain HTML, CSS and JavaScript (ES modules), no build step and no dependencies. UI text is Turkish.
 
 ## ▶ [Play Man Run](https://codder-ctrl.github.io/man-run/)
 
@@ -38,15 +38,15 @@ Your animal runs by itself. You only decide when to jump, slide and use your ite
   - 🐻 Kapan: a bear trap dropped behind you, or thrown where you aim; it never catches its owner
   - 💨 Hız: a few seconds of top speed
   - 🔨 Örs: drops on the leader's head after a red "!" warning
-- **Track:** speed pads speed you up, mud slows you down, spikes stun you. Fall into a pit and you continue a bit further back.
+- **Track:** one unbroken path, nothing to fall into. Speed pads speed you up, mud slows you down, spikes stun you, walls and steps are jumped or climbed, low rock roofs are slid under, and wooden boardwalks give an upper route.
 
 ## Maps
 
-Every race builds a new track from a random seed: rolling hills, valleys, pits, cliffs, stone walls, floating islands, upper ledge routes and low rock roofs. Pick a map in the menu, or 🎲 Karışık for a random one:
+Every race builds a new track from a random seed: a light path rolling over hills and valleys, with steps, stone walls, spikes, mud, low rock roofs and wooden boardwalks. Behind the path a field rises to the hill line; in front of it the field comes toward you down to the bottom of the screen, its grass growing bigger and richer as it gets nearer. Pick a map in the menu, or 🎲 Karışık for a random one:
 
-- **🌳 Orman:** cobbled earth, thick grass, falling leaves.
-- **❄️ Karlı Dağ:** snow caps with icicles, ice blocks, snowmen, snowfall.
-- **🏜️ Çöl:** sandstone, mesas, cacti, tumbleweeds, blowing sand.
+- **🌳 Orman:** a sandy path through a green, flowery meadow; falling leaves.
+- **❄️ Karlı Dağ:** a trodden snow path through snowy fields; ice blocks, snowmen, snowfall.
+- **🏜️ Çöl:** a pale sand path through dry golden grass; mesas, cacti, tumbleweeds, blowing sand.
 
 ## Playing with friends
 

@@ -36,3 +36,14 @@ test('race steps of varying length still finish (variable frame time)', () => {
   }
   assert.equal(race.finishedCount, 4);
 });
+
+test('tracks have no pits: the path is unbroken from start to finish', () => {
+  for (const seed of [1, 2, 3, 42, 777, 2026, 31337]) {
+    const race = createRace({ seed });
+    const ground = race.T.solids.filter((s) => s.kind === 'ground').sort((a, b) => a.x - b.x);
+    for (let i = 1; i < ground.length; i++) {
+      const gapW = ground[i].x - (ground[i - 1].x + ground[i - 1].w);
+      assert.ok(Math.abs(gapW) < 1, `seed ${seed}: a ${gapW.toFixed(0)}-unit gap at x=${Math.round(ground[i].x)}`);
+    }
+  }
+});
