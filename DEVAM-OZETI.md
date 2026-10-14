@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.9.0** (duvara yapışıp zıplayarak tırmanma, büyük seken testere, büyük kişiye özel kapan). Yerelde hazır: **v0.10.0** (yükleme ekranı, menü arka planı, biçerek geçen testere; 'yükle' bekleniyor).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.10.0** (yükleme ekranı, menü arka planı, biçerek geçen testere). v0.10 için puan bekleniyor; kullanıcı telefonda deneyecek. Sonraki büyük iş: karakterleri Blender'da yapmak (kullanıcı 'sonra' dedi).
 
 ## Proje
 
@@ -242,7 +242,7 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.9.0** (duvara yapışıp zıpl
   - Kutular gibi herkese ayrı çalışıyor: herkesi bir kez yakalar, biri takıldı diye kapan kaybolmaz. Seni yakaladıktan sonra senin ekranında solup kaybolur, diğerleri için yerinde durur.
 - **Yardım ekranı ve README** yeni tırmanmaya ve eşyalara göre güncellendi.
 
-## v0.10.0'da olanlar (kullanıcının v0.9 notları, yerelde hazır)
+## v0.10.0'da olanlar (kullanıcının v0.9 notları)
 
 - **Testere biçerek geçiyor:** Rakibe çarpınca artık kırılmıyor. Değdiği herkesi birer kez devirip yoluna devam ediyor; 3,2 saniye sonra küçülüp solarak kayboluyor. Duvardan sekmeye devam ediyor (sekme sınırı kalktı, süre belirliyor). Kalkanlı rakip bloklar ama testere yine durmaz.
 - **Yükleme ekranı:**
