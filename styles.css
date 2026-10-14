@@ -94,17 +94,102 @@ button {
 }
 .chip[aria-pressed='false'] { opacity: 0.55; text-decoration: line-through; }
 
+/* ---- Loading screen ---- */
+
+#splash { z-index: 12; padding: 0; overflow: hidden; cursor: pointer; background: linear-gradient(#3a86dc, #9fd3f4 52%, #6dbd46 70%, #2b6b22); --p: 0.04; }
+.splash-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 55%;
+  opacity: 0;
+  transform: scale(1.05);
+  transition: opacity 0.5s, transform 2.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.splash-art.in { opacity: 1; transform: none; }
+#splash.out { opacity: 0; transform: scale(1.06); transition: opacity 0.5s, transform 0.5s; pointer-events: none; }
+.splash-ui {
+  position: absolute;
+  left: 50%;
+  bottom: max(5%, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(500px, 56vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.load-track {
+  position: relative;
+  width: 100%;
+  height: 26px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: rgba(42, 27, 23, 0.6);
+  box-shadow: 0 4px 0 rgba(42, 27, 23, 0.9), inset 0 3px 0 rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s;
+}
+.load-fill {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: calc((100% - 6px) * var(--p));
+  min-width: 14px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(-45deg, #8be862 0 12px, #5cc945 12px 24px);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.15);
+  animation: stripes 0.6s linear infinite;
+}
+@keyframes stripes { to { background-position: 34px 0; } }
+.load-runner {
+  position: absolute;
+  top: 50%;
+  left: calc(3px + (100% - 6px) * var(--p));
+  width: 50px;
+  height: 50px;
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 3px 0 rgba(42, 27, 23, 0.6));
+  transform: translate(-50%, -62%);
+  animation: hop 0.3s ease-in-out infinite alternate;
+}
+@keyframes hop { to { transform: translate(-50%, -80%) rotate(7deg); } }
+.load-text {
+  font-family: 'Lilita One', sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+  color: #fff;
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 var(--ink);
+}
+.splash-tip { font-size: 14px; font-weight: 700; color: #fff; text-align: center; text-shadow: 0 1px 0 var(--ink), 0 0 6px rgba(0, 0, 0, 0.6); min-height: 1.2em; }
+#splash.ready .load-track { opacity: 0; }
+#splash.ready .load-text { font-size: 34px; color: var(--gold); -webkit-text-stroke: 3px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: tapPulse 1s ease-in-out infinite; margin-top: -34px; }
+@keyframes tapPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.splash-version { color: #fff; opacity: 0.6; }
+/* Short landscape phones: a slimmer bar lower down, clear of the runners' feet. */
+@media (max-height: 430px) {
+  .splash-ui { bottom: max(2.5%, env(safe-area-inset-bottom)); gap: 3px; }
+  .load-track { height: 18px; border-width: 2.5px; }
+  .load-fill { top: 2px; bottom: 2px; left: 2px; }
+  .load-runner { width: 36px; height: 36px; }
+  .load-text { font-size: 16px; -webkit-text-stroke-width: 1.5px; }
+  .splash-tip { font-size: 11.5px; }
+  #splash.ready .load-text { font-size: 26px; margin-top: -24px; }
+}
+
 /* ---- Menu ---- */
 
-#menu { background: linear-gradient(#57ade6, #a9dcf5 60%, #7cc25c 60.2%, #5aa848); overflow: hidden; }
+#menu { background: #6cbd45 url(img/menu-bg.webp) 50% 40% / cover no-repeat; overflow: hidden; }
+#menu.enter .menu-inner { animation: menuIn 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.15) both; }
+@keyframes menuIn { from { opacity: 0; transform: translateY(24px) scale(0.96); } }
 .menu-sky {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 82% 18%, rgba(255, 247, 214, 0.95) 0 5%, rgba(255, 246, 200, 0.45) 9%, transparent 22%),
-    radial-gradient(ellipse 120px 34px at 15% 22%, #fff 60%, transparent 62%),
-    radial-gradient(ellipse 90px 26px at 22% 18%, #fff 60%, transparent 62%),
-    radial-gradient(ellipse 140px 36px at 62% 12%, #fff 60%, transparent 62%);
+  background: linear-gradient(rgba(20, 40, 90, 0) 45%, rgba(18, 34, 12, 0.28));
   pointer-events: none;
 }
 .menu-inner { position: relative; width: min(860px, 100%); display: flex; flex-direction: column; align-items: center; gap: 8px; max-height: 100%; }

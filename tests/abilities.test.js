@@ -171,6 +171,30 @@ test('big saws bounce back off upright walls', () => {
   assert.ok(bounced, 'it came back off the wall');
 });
 
+test('a saw mows through every runner it touches and wears out by itself', () => {
+  const race = createRace({ seed: 7, theme: 'forest', allBots: true });
+  while (race.phase !== 'race') stepRace(race, STEP);
+  const [owner, a, b] = race.runners;
+  owner.item = 'saw';
+  useItem(race, owner, 0);
+  const saw = race.saws[0];
+  // Two runners standing (dazed) in its way.
+  for (const [r, dx] of [[a, 120], [b, 260]]) {
+    Object.assign(r, { x: saw.x + dx, y: owner.y, vx: 0, vy: 0, shield: 0, stun: 5, invuln: 0, grounded: true });
+  }
+  const hits = new Set();
+  let lived = 0;
+  for (let t = 0; t < 6 && race.saws.length; t += STEP) {
+    stepRace(race, STEP);
+    for (const e of race.events) if (e.type === 'hit' && e.kind === 'saw') hits.add(e.id);
+    race.events.length = 0;
+    lived = t;
+  }
+  assert.ok(hits.has(a.id) && hits.has(b.id), 'both runners were cut');
+  assert.equal(race.saws.length, 0, 'the saw is gone in the end');
+  assert.ok(lived > 2.5, `it kept going after the hits (${lived.toFixed(1)} s)`);
+});
+
 test('a trap catches every runner once, not just the first', () => {
   const race = createRace({ seed: 7, theme: 'forest', allBots: true });
   while (race.phase !== 'race') stepRace(race, STEP);

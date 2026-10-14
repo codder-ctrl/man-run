@@ -17,7 +17,7 @@ const REPORT_EVERY = 1 / 30;
 const INTERP = 0.1;
 const STUNS = [null, 'lightning', 'saw', 'trap', 'anvil', 'spikes'];
 // Events worth sending to friends (movement events are inferred on each phone instead).
-const FORWARD = new Set(['box', 'hit', 'blocked', 'lightning', 'sawBreak', 'trap', 'anvil', 'anvilWarn', 'use', 'finish', 'itemReady', 'done']);
+const FORWARD = new Set(['box', 'hit', 'blocked', 'lightning', 'sawBreak', 'sawCut', 'trap', 'anvil', 'anvilWarn', 'use', 'finish', 'itemReady', 'done']);
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -45,7 +45,7 @@ export function createHostSync(race, peers, send) {
         r.duck ? 1 : 0, r2(r.dash), r.climb ? 1 : 0, r.aim === null || r.aim === undefined ? null : r2(r.aim),
         AIM_KINDS.indexOf(r.aimKind),
       ]),
-      sw: race.saws.map((s) => [s.id, r1(s.x), r1(s.y), Math.round(s.vx), s.grounded ? 1 : 0]),
+      sw: race.saws.map((s) => [s.id, r1(s.x), r1(s.y), Math.round(s.vx), s.grounded ? 1 : 0, r2(s.life)]),
       // Traps: which runners each one has caught, as bits (they're per runner, like boxes).
       tr: race.traps.map((t) => [t.id, r1(t.x), r1(t.y), Object.keys(t.caught).reduce((m, k) => m | (1 << +k), 0), t.owner]),
       an: race.anvils.map((a) => [a.id, a.target, r2(a.t), a.warn, a.fall, r1(a.x), r1(a.y), a.done ? 1 : 0]),
@@ -137,9 +137,9 @@ export function createGuestSync(race, send) {
     for (let i = 0; i < race.runners.length; i++) race.runners[i].place = s.r[i][17];
     race.order = race.runners.slice().sort((a, b) => a.place - b.place);
     // Saws, traps, anvils. (Boxes are per runner: this phone marks its own as it touches them.)
-    race.saws = s.sw.map(([id, x, y, vx, g]) => {
+    race.saws = s.sw.map(([id, x, y, vx, g, life]) => {
       const old = race.saws.find((o) => o.id === id);
-      return { id, x, y, vx, grounded: !!g, spin: old ? old.spin : 0 };
+      return { id, x, y, vx, grounded: !!g, life, spin: old ? old.spin : 0 };
     });
     race.traps = s.tr.map(([id, x, y, mask, owner]) => {
       const old = race.traps.find((o) => o.id === id);

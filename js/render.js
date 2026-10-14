@@ -117,7 +117,8 @@ export function createRenderer(canvas) {
         cam.shake = Math.max(cam.shake, 8);
         break;
       }
-      case 'sawBreak': fx.sparks(e.x, e.y, '#ffffff', 16); fx.pow(e.x, e.y, '#ffffff'); break;
+      case 'sawBreak': fx.sparks(e.x, e.y, '#ffffff', 10); fx.ring(e.x, e.y, 26, '#ffffff', 0.25); break;
+      case 'sawCut': fx.sparks(e.x, e.y, '#ffd23f', 18); fx.ring(e.x, e.y, 40, '#ffffff', 0.3); break;
       case 'sawBounce': fx.sparks(e.x, e.y, '#ffd23f', 14); fx.ring(e.x, e.y, 30, '#ffffff', 0.25); break;
       case 'trap': fx.sparks(e.x, e.y - 6, '#e0e6ec', 12); break;
       case 'anvil': fx.landing(e.x, e.y, dust, true); if (race.runners[e.id] === race.player) cam.shake = 14; break;
@@ -240,15 +241,19 @@ export function createRenderer(canvas) {
     for (const r of order) if (r.dead <= 0 && vis(r.x)) drawRunner(r, t, r === p, dt);
 
     for (const sw of race.saws) {
-      const cy = sw.y - SAW_R * 0.92;
+      // Its last moments: it shrinks and fades away instead of popping out.
+      const fade = Math.max(0, Math.min(1, (sw.life ?? 1) / 0.4));
+      const rad = SAW_R * (0.55 + 0.45 * fade);
+      const cy = sw.y - rad * 0.92;
       const back = Math.sign(sw.vx || 1);
       for (let k = 3; k >= 1; k--) {
-        ctx.globalAlpha = 0.18 * (4 - k) / 3;
-        drawSaw(ctx, sw.x - back * k * 16, cy, SAW_R, sw.spin - k * 0.4);
+        ctx.globalAlpha = 0.18 * (4 - k) / 3 * fade;
+        drawSaw(ctx, sw.x - back * k * 16, cy, rad, sw.spin - k * 0.4);
       }
+      ctx.globalAlpha = fade;
+      drawSaw(ctx, sw.x, cy, rad, sw.spin);
       ctx.globalAlpha = 1;
-      drawSaw(ctx, sw.x, cy, SAW_R, sw.spin);
-      if (sw.grounded) fx.grind(sw.x - back * 14, sw.y - 1, -back);
+      if (sw.grounded && fade > 0.5) fx.grind(sw.x - back * 14, sw.y - 1, -back);
     }
     for (const a of race.anvils) drawAnvilDrop(a, t);
     // The aiming player's own arrow and predicted path: only on this screen.

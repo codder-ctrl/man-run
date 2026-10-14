@@ -32,6 +32,8 @@ const SHELL = [
   'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png',
   'icons/favicon-32.png',
+  'img/splash.webp',
+  'img/menu-bg.webp',
 ];
 
 self.addEventListener('install', (event) => {

@@ -138,7 +138,7 @@ function makeSaw(race, r, angle) {
   const push = dir > 0 ? Math.max(0, r.vx) : 0;
   const speed = SAW_SPEED + push;
   const size = SAW_R * 1.85;
-  return { id: race.nextId++, x: r.x + (SAW_R + 16) * Math.cos(a), y: r.y - 2 - Math.max(0, Math.sin(a)) * 20, vx: Math.cos(a) * speed, vy: -Math.sin(a) * speed * 0.85, speed, dir, rollOn: angle === null || angle === undefined || Math.abs(Math.sin(a)) < 0.2, w: size, h: size, grounded: false, owner: r.id, life: SAW_LIFE, spin: 0, bounces: 0 };
+  return { id: race.nextId++, x: r.x + (SAW_R + 16) * Math.cos(a), y: r.y - 2 - Math.max(0, Math.sin(a)) * 20, vx: Math.cos(a) * speed, vy: -Math.sin(a) * speed * 0.85, speed, dir, rollOn: angle === null || angle === undefined || Math.abs(Math.sin(a)) < 0.2, w: size, h: size, grounded: false, owner: r.id, life: SAW_LIFE, spin: 0, bounces: 0, hits: {} };
 }
 // Traps are per runner, like the boxes: catching one runner doesn't spring it for the others
 // (caught[runnerId] = race time it caught them). It never catches its owner.
@@ -326,20 +326,22 @@ function updateSaws(race, dt) {
     const res = stepSaw(s, dt, T);
     if (res.bounced) emit(race, 'sawBounce', { x: s.x + s.dir * -s.w / 2, y: s.y - s.h / 2 });
     if (s.y > T.lowest + 400) s.life = 0;
+    // A saw mows on through runners (the user asked for it): everyone it touches is knocked down
+    // once (hits[runnerId]) and it keeps going until its time runs out.
     for (const r of race.runners) {
-      if (r.id === s.owner || r.dead > 0 || r.finished || s.life <= 0) continue;
+      if (r.id === s.owner || r.dead > 0 || r.finished || s.life <= 0 || s.hits[r.id]) continue;
       if (Math.abs(r.x - s.x) < (r.w + s.w) / 2 && s.y > r.y - r.h && s.y - s.h < r.y) {
-        hit(race, r, 'saw', race.runners[s.owner]);
-        s.life = 0;
-        emit(race, 'sawBreak', { x: s.x, y: s.y - s.h / 2 });
+        s.hits[r.id] = true;
+        if (hit(race, r, 'saw', race.runners[s.owner])) emit(race, 'sawCut', { x: r.x, y: r.y - r.h / 2 });
       }
     }
+    if (s.life <= 0) emit(race, 'sawBreak', { x: s.x, y: s.y - s.h / 2 });
   }
   race.saws = race.saws.filter((s) => s.life > 0);
 }
 
 // One step of a saw: flies under gravity, rolls along the ground once it lands (in the direction
-// it was thrown), hops over walls. Shared with the aim preview.
+// it was thrown), bounces back off walls. Shared with the aim preview.
 export function stepSaw(s, dt, T) {
   s.spin += dt * 30 * (s.dir || 1);
   s.vy = Math.min(PHYS.maxFall, s.vy + PHYS.gravity * dt);
@@ -353,7 +355,6 @@ export function stepSaw(s, dt, T) {
     if (s.grounded) s.vy = -260;
     s.bounces = (s.bounces || 0) + 1;
     res.bounced = true;
-    if (s.bounces > 6) s.life = 0;
   }
   return res;
 }
@@ -469,7 +470,7 @@ export function stepRace(race, dt, input = {}) {
   }
   if (guest) {
     // Saws keep flying between snapshots; anvils keep their clocks.
-    for (const s of race.saws) { s.x += s.vx * dt; s.spin += dt * 30; }
+    for (const s of race.saws) { s.x += s.vx * dt; s.spin += dt * 30; s.life -= dt; }
     for (const a of race.anvils) a.t += dt;
     return;
   }

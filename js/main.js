@@ -68,7 +68,7 @@ const params = new URLSearchParams(location.search);
 const AUTO = params.has('auto');
 const MAP_PARAM = THEMES[params.get('map')] ? params.get('map') : null;
 let hitStop = 0;
-let mode = 'menu'; // menu | race | pause | results
+let mode = 'splash'; // splash | menu | race | pause | results
 let race = null;
 
 function show(id, on) { $(id).classList.toggle('hidden', !on); }
@@ -78,6 +78,7 @@ function toMenu() {
   race = null;
   sync = null;
   stopMusic();
+  show('splash', false);
   show('menu', true);
   show('hud', false);
   show('pause', false);
@@ -148,7 +149,7 @@ function buildMenu() {
   const desc = {
     lightning: 'Herkesi çarpar, sersemletir',
     shield: 'Saldırılardan ve dikenlerden korur',
-    saw: 'Atılır, duvardan seker, çarptığını devirir',
+    saw: 'Duvardan seker, değdiği herkesi biçer',
     trap: 'Basan herkes bir kez takılır',
     speed: 'Kısa süre çok hızlı koşarsın',
     anvil: 'Öndekinin kafasına düşer',
@@ -199,6 +200,71 @@ function drawPreview(t) {
   drawAnimal(pg, save.animal, poseFor(fake, t), t);
 }
 
+// ---- Loading screen ----
+// The key art with a loading bar while the art, fonts and menu backdrop load, then "tap to start"
+// (the tap also unlocks sound and, on phones, full screen) and the character select menu.
+
+const TIPS = [
+  'İpucu: Duvara yapış, zıpla zıpla tırman!',
+  'İpucu: 🐾 düğmesini basılı tut ve kaydır, her yöne atıl.',
+  'İpucu: Testereyi geriye at, arkandakileri biç!',
+  'İpucu: Kırmızı halkalı kapanlara basma.',
+  'İpucu: Gereksiz zıplama, havada yavaşlarsın.',
+  'İpucu: Alçak kayaların altından EĞİL ile kay.',
+  'İpucu: Eşya düğmesini basılı tut, bırakınca kullanılır.',
+];
+const loading = { p: 0.04, target: 0.04, ready: false, t0: performance.now(), last: performance.now() };
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const settle = (p, ms) => Promise.race([Promise.resolve(p).catch(() => {}), wait(ms)]);
+function preload(src) {
+  const img = new Image();
+  img.src = src;
+  return img.decode ? img.decode() : new Promise((r) => { img.onload = r; img.onerror = r; });
+}
+async function boot() {
+  $('load-runner').style.backgroundImage = `url(${portrait(save.animal, 100)})`;
+  $('splash-tip').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+  $('splash-version').textContent = 'v' + VERSION;
+  loading.target = 0.25;
+  const art = $('splash-art');
+  await settle(art.decode ? art.decode() : null, 5000);
+  art.classList.add('in');
+  loading.target = 0.5;
+  await settle(document.fonts && Promise.all([document.fonts.load('30px "Lilita One"'), document.fonts.load('700 16px Fredoka')]), 3000);
+  loading.target = 0.75;
+  await settle(preload('img/menu-bg.webp'), 4000);
+  loading.target = 1;
+}
+// Eases the bar toward the progress, never faster than ~1.6 s for the whole bar. Runs on real
+// time so a slow frame rate can't hold it back.
+function updateSplash(now) {
+  const dt = Math.min(0.25, Math.max(0, (now - loading.last) / 1000));
+  loading.last = now;
+  const cap = (now - loading.t0) / 1600;
+  const goal = Math.min(loading.target, cap);
+  loading.p += (goal - loading.p) * Math.min(1, dt * 6);
+  $('splash').style.setProperty('--p', loading.p.toFixed(4));
+  if (!loading.ready && loading.target >= 1 && loading.p > 0.985) {
+    loading.ready = true;
+    $('splash').classList.add('ready');
+    $('load-text').textContent = matchMedia('(pointer: coarse)').matches ? 'Başlamak için dokun' : 'Başlamak için tıkla';
+    sfx('itemReady');
+  }
+}
+function leaveSplash() {
+  if (mode !== 'splash' || !loading.ready) return;
+  initAudio();
+  sfx('go');
+  goFullscreen();
+  mode = 'menu';
+  $('splash').classList.add('out');
+  show('menu', true);
+  $('menu').classList.add('enter');
+  refreshMenu();
+  setTimeout(() => show('splash', false), 550);
+}
+$('splash').addEventListener('click', leaveSplash);
+
 // ---- Race ----
 
 const pickMap = (m) => (m === 'mix' || !THEMES[m] ? THEME_IDS[Math.floor(Math.random() * THEME_IDS.length)] : m);
@@ -218,6 +284,7 @@ function beginRace() {
   renderer.setRace(race);
   buildHeads();
   mode = 'race';
+  show('splash', false);
   show('menu', false);
   show('results', false);
   show('pause', false);
@@ -353,7 +420,7 @@ function handleEvent(e) {
       if (e.from === race.player.id && !me) banner(`${nameOf(r)} vuruldu!`);
       break;
     case 'blocked': if (me || near) sfx('blocked'); break;
-    case 'sawBreak': if (near) sfx('sawBreak'); break;
+    case 'sawBreak': case 'sawCut': if (Math.abs(e.x - race.player.x) < 700) sfx('sawBreak'); break;
     case 'sawBounce': if (Math.abs(e.x - race.player.x) < 700) sfx('sawBreak'); break;
     case 'trap': if (me || near) sfx('trap'); break;
     case 'pad': if (me) sfx('pad'); break;
@@ -527,6 +594,7 @@ window.addEventListener('keydown', (e) => {
     else if (PAW_KEYS.has(e.code)) { e.preventDefault(); if (!e.repeat) aimStart('paw', 'k', 0, 0); }
     else if (e.code === 'Escape' || e.code === 'KeyP') pause();
   } else if (mode === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
+  else if (mode === 'splash' && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) { e.preventDefault(); leaveSplash(); }
   else if (mode === 'menu' && (e.code === 'Space' || e.code === 'Enter') && !e.target.closest?.('input') && $('online').classList.contains('hidden')) { e.preventDefault(); startRace(); }
   else if (mode === 'results' && (e.code === 'Space' || e.code === 'Enter') && online.role !== 'guest') { e.preventDefault(); startRace(); }
 });
@@ -774,6 +842,7 @@ function frame(now, fromRaf) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const t = now / 1000;
+  if (mode === 'splash') updateSplash(now);
   if (mode === 'menu') drawPreview(t);
   let drawDt = mode === 'race' ? dt : 0;
   if (race && mode === 'race') {
@@ -816,6 +885,7 @@ function frame(now, fromRaf) {
 buildMenu();
 renderer.resize();
 checkRotate();
+boot();
 requestAnimationFrame(frame);
 
 if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {

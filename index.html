@@ -13,13 +13,25 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Lilita+One&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="img/splash.webp" fetchpriority="high">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <canvas id="scene"></canvas>
 
+  <!-- Loading screen: the key art and a loading bar, then "tap to start" opens the menu -->
+  <section id="splash" class="screen">
+    <img id="splash-art" class="splash-art" src="img/splash.webp" alt="Man Run" fetchpriority="high" onload="this.classList.add('in')">
+    <div class="splash-ui">
+      <div class="load-track"><div class="load-fill"></div><span id="load-runner" class="load-runner"></span></div>
+      <div id="load-text" class="load-text">Yükleniyor…</div>
+      <div id="splash-tip" class="splash-tip"></div>
+    </div>
+    <div id="splash-version" class="version splash-version"></div>
+  </section>
+
   <!-- Menu -->
-  <section id="menu" class="screen">
+  <section id="menu" class="screen hidden">
     <div class="menu-sky"></div>
     <div class="menu-inner">
       <h1 class="logo"><span class="l1">MAN</span><span class="l2">RUN</span></h1>
@@ -155,7 +167,7 @@
       <p>Karakterin kendi koşar. Sen sadece <b>zıplar</b> ve <b>eşya kullanırsın</b>. Bitiş bayrağına ilk varan kazanır!</p>
       <ul>
         <li><b>Zıpla:</b> ekranın sol tarafına dokun (bilgisayarda <kbd>Boşluk</kbd>). Basılı tutarsan daha yükseğe zıplarsın.</li>
-        <li><b>Eşya:</b> sağ alttaki düğmeye <b>basılı tut, bırakınca</b> kullanılır (bilgisayarda <kbd>E</kbd>). <b>Testere</b> ve <b>Kapan</b>'ı basılı tutarken parmağını kaydırarak her yöne nişan alabilirsin; ekranında ok ve gideceği yol çıkar. Testere dik duvara çarpınca geri seker. Başkasının kurduğu kapanın etrafında kalın kırmızı bir halka olur; kapan da kutular gibi herkese ayrı çalışır, biri takıldı diye ötekiler kurtulmaz. Eşyaları <span class="qbox">?</span> kutularından alırsın.</li>
+        <li><b>Eşya:</b> sağ alttaki düğmeye <b>basılı tut, bırakınca</b> kullanılır (bilgisayarda <kbd>E</kbd>). <b>Testere</b> ve <b>Kapan</b>'ı basılı tutarken parmağını kaydırarak her yöne nişan alabilirsin; ekranında ok ve gideceği yol çıkar. Testere değdiği herkesi biçerek yoluna devam eder, dik duvara çarpınca geri seker ve birkaç saniye sonra kaybolur. Başkasının kurduğu kapanın etrafında kalın kırmızı bir halka olur; kapan da kutular gibi herkese ayrı çalışır, biri takıldı diye ötekiler kurtulmaz. Eşyaları <span class="qbox">?</span> kutularından alırsın.</li>
         <li><b>Eğil:</b> <b>EĞİL</b>'e bir kez dokun (bilgisayarda <kbd>↓</kbd>): kısa bir süre kayarsın, sonra kendin kalkarsın. Alçak kaya tavanlarının altından böyle geçilir; havadayken dokunursan hızla yere iner, kayarak devam edersin.</li>
         <li><b>Tırman:</b> Havadayken dik bir duvara değersen ona yapışırsın. Her zıplayışta bir zıplama boyu yukarı çıkıp yeniden tutunursun; zıplamazsan yavaş yavaş aşağı kayarsın. Zıplamaya devam et, duvarın üstüne çıkarsın.</li>
         <li><b>Mavi pati:</b> 🐾 düğmesi zamanla dolar. Dolunca <b>basılı tut ve parmağını kaydır</b>: ekranında bir ok ve gideceğin yol çıkar. Bırakınca o yöne atılırsın (her yöne, geriye bile); yukarı atarak duvarların üstünden geçebilirsin. Kısa dokunuş düz ileri atar. (Bilgisayarda <kbd>Q</kbd>'yu basılı tut, <kbd>↑</kbd>/<kbd>↓</kbd> ile nişan al, bırak.)</li>

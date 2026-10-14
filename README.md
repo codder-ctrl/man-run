@@ -34,7 +34,7 @@ Your animal runs by itself. You only decide when to jump, slide and use your ite
 - **Items** (the last runners get the strongest ones):
   - ⚡ Şimşek: zaps everyone (they turn into x-ray skeletons for a moment)
   - 🛡️ Kalkan: blocks attacks and spikes
-  - 🪚 Testere: a big saw thrown any way you aim (even back at a chaser); it rolls along, bounces back off upright walls and knocks down the first runner it hits
+  - 🪚 Testere: a big saw thrown any way you aim (even back at a chaser); it rolls along, bounces back off upright walls and mows down everyone it touches (each runner once) until it wears out after about 3 seconds
   - 🐻 Kapan: a big bear trap dropped behind you, or thrown where you aim. Like the boxes it works for each runner on their own: it catches everyone who steps in it once, not just the first, and never its owner. Traps set by someone else have a thick red rim
   - 💨 Hız: a few seconds of top speed
   - 🔨 Örs: drops on the leader's head after a red "!" warning
@@ -68,6 +68,8 @@ python -m http.server 8004 --directory Man_Run
 
 Then open <http://localhost:8004>. On a phone on the same Wi-Fi, open `http://<your-PC-IP>:8004`.
 
+The loading screen picture and the menu backdrop are painted by `tools/splash.js` with the game's own characters. To redraw them, run `npm run splash` and open the printed URL; the page writes `img/splash.webp` and `img/menu-bg.webp`.
+
 Run the tests (Node 18+):
 
 ```bash
@@ -97,3 +99,4 @@ The tests race four bots on generated tracks of every map, wire a host and a gue
 | `js/main.js` | Menu, HUD, input, online screens, install guide, game loop |
 | `tools/pose-lab.html` | Development view of every animal in every pose |
 | `tools/icon-server.js`, `tools/icons.html` | App icon generator |
+| `tools/splash.js`, `tools/splash.html` | Loading screen picture and menu backdrop generator |

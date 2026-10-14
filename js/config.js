@@ -1,7 +1,7 @@
 // Game constants: physics, animals, items. World units: y grows downward, a runner is about
 // 60 units tall, the view is VIEW_H units tall whatever the screen size.
 
-export const VERSION = '0.9.0';
+export const VERSION = '0.10.0';
 
 export const VIEW_H = 450; // a little wider than before: runners are faster now
 export const STEP = 1 / 120; // fixed physics step (seconds)

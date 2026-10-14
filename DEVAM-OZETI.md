@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.9.0** (duvara yapışıp zıplayarak tırmanma, büyük seken testere, büyük kişiye özel kapan). v0.9 için puan bekleniyor; kullanıcı telefonda deneyecek.
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.9.0** (duvara yapışıp zıplayarak tırmanma, büyük seken testere, büyük kişiye özel kapan). Yerelde hazır: **v0.10.0** (yükleme ekranı, menü arka planı, biçerek geçen testere; 'yükle' bekleniyor).
 
 ## Proje
 
@@ -63,6 +63,19 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.9.0** (duvara yapışıp zıpl
 
 - **Oynanış notu:** Duvara tırmanma hâlâ eksikti. Karakter nerede olursa olsun dik duvara değince yapışmalı, her zıplayışta bir zıplama boyu çıkıp yeniden tutunmalı, zıplamazsa yavaş yavaş aşağı kaymalı. v0.9.0'da yapıldı.
 - Ayrıca istenenler (v0.9.0'da yapıldı): testere 2,5 kat büyük ve dik duvardan geri seksin; kapan 1,5 kat büyük; oyuncunun attığı kapanın etrafında kalın kırmızı çizgi; kapanlar kutular gibi herkese ayrı çalışsın.
+
+**v0.9.0, kullanıcının puanları** (2026-10-14):
+
+| Akıcılık | Grafik | Efektler | Ses | Oynanış |
+|---|---|---|---|---|
+| 7 | 6,5 | 7 | 6 | 7 |
+
+- **Akıcılık:** Hâlâ Fun Run kadar akıcı değil. Mekanikler gelişti ama karakterlerin "akarak giden yüksek fps'li hareketleri" yok. Karakterler SVG/vektör; kullanıcı **Blender'a geçmek istiyor ama sonra** (şimdilik değil).
+- **Grafik (7 → 6,5):** Karakterlerin akıcılığı artmalı, daha "smooth" hissettirmeli; üzerinde çalışılacak.
+- **Efektler:** Şimdilik güzel. **Ses:** Fena değil, sonra gelişir.
+- **Oynanış:** Tek eksik: fırlatılan testere bir rakibe çarpınca bitiyordu. Belli bir süre sonra yok olmalı ama rakibe çarpınca biçmeye devam etmeli. (Kullanıcı "tuzak" yazdı ama "biçmeye devam" dediği için testere olarak anlaşıldı ve kullanıcıya böyle söylendi.) v0.10.0'da yapıldı.
+- **Ayrıca istedi:** Ana girişi daha kaliteli bir görsele çevirmek: oyunun yükleme ekranı olsun, sonra karakter seçim ekranına geçilsin. v0.10.0'da yapıldı.
+- **Sonraki büyük iş (kullanıcı söyledi):** Karakterleri Blender'da yapmak (3D modelden hazırlanmış kareler gibi daha akıcı animasyon). Kullanıcı "şimdi geçmeyelim, sonra geçeceğiz" dedi.
 
 **Sıra (kullanıcı, 2026-10-13):** Önce arkadaşlarla oynanabilir hale getirmek, sonra oyunu geliştirmek (eğilme, mavi pati, akıcılık).
 
@@ -229,8 +242,20 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.9.0** (duvara yapışıp zıpl
   - Kutular gibi herkese ayrı çalışıyor: herkesi bir kez yakalar, biri takıldı diye kapan kaybolmaz. Seni yakaladıktan sonra senin ekranında solup kaybolur, diğerleri için yerinde durur.
 - **Yardım ekranı ve README** yeni tırmanmaya ve eşyalara göre güncellendi.
 
+## v0.10.0'da olanlar (kullanıcının v0.9 notları, yerelde hazır)
+
+- **Testere biçerek geçiyor:** Rakibe çarpınca artık kırılmıyor. Değdiği herkesi birer kez devirip yoluna devam ediyor; 3,2 saniye sonra küçülüp solarak kayboluyor. Duvardan sekmeye devam ediyor (sekme sınırı kalktı, süre belirliyor). Kalkanlı rakip bloklar ama testere yine durmaz.
+- **Yükleme ekranı:**
+  - Oyun açılınca tam ekran bir afiş görseli çıkıyor: büyük parlak "MAN RUN" logosu, arkasında güneş ışınları. Altında dağlar, çayır, patika ve yarışan dört karakter var: testere atan ayı, arkasına bakan panda, taş duvarın üstünden atlayan tavşan, mavi patiyle uçan tilki ve "?" kutusu.
+  - Görsel, oyunun kendi karakterleriyle yüksek çözünürlükte bir kez çizilip dosyaya kaydedildi (`img/splash.webp`, 2560×1280). Oyunun içinde yapılamayacak efektler kullanıldı: bulanık derinlik katmanları, on binlerce ot yaprağı, ışıltı.
+  - Altta yeşil çizgili bir yükleme çubuğu var, üstünde seçili hayvanın kafası zıplayarak ilerliyor; altında rastgele bir ipucu yazıyor.
+  - Yükleme bitince "Başlamak için dokun" yazısı nabız gibi atıyor. Dokununca ses açılıyor, telefonda tam ekrana geçiyor ve karakter seçim ekranı açılıyor.
+- **Menü (karakter seçimi):** Arka planı aynı sahnenin logosuz, karaktersiz hali oldu (`img/menu-bg.webp`). Menü açılırken hafifçe yukarı kayarak beliriyor.
+- **Araç:** `npm run splash` → `tools/splash.html` açılınca iki görseli yeniden çizip yazar. Görseli değiştirmek için `tools/splash.js` düzenlenir.
+
 ## Öğrenilenler
 
+- **Dokunmatik ekranda `pointerdown` kullanıcı hareketi sayılmaz:** Ses açma ve tam ekran için `click` (ya da `pointerup`) kullanılmalı.
 - **Taşları tek tek çizme:** Zemin parçaları önbelleğe çizilirken her taşı ayrı çizmek, parça başına 100 ile 1300 ms donmaya yol açtı. Çözüm: taş dokusu bir kez desen olarak hazırlanıyor ve tekrar kullanılıyor.
 
 ## Fikir listesi (kullanıcıyla konuşulacak)
