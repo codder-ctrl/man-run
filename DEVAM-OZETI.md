@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.5.0**. Yerelde hazır: **v0.6.0** (nişanlı mavi pati; "yükle" bekleniyor).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.6.0** (nişanlı mavi pati). Kullanıcının telefonda denemesi ve puanı bekleniyor.
 
 ## Proje
 
