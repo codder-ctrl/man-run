@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.8.0** (çayır dünyası, patika, çukursuz harita). Yerelde hazır: **v0.9.0** (duvara yapışıp zıplayarak tırmanma, büyük seken testere, büyük kişiye özel kapan; 'yükle' bekleniyor).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.9.0** (duvara yapışıp zıplayarak tırmanma, büyük seken testere, büyük kişiye özel kapan). v0.9 için puan bekleniyor; kullanıcı telefonda deneyecek.
 
 ## Proje
 
@@ -213,7 +213,7 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.8.0** (çayır dünyası, pati
   - Çalılar ve ağaçlar patikanın arka kenarında duruyor.
 - **Hata düzeltmesi:** Kapana yakalanan karakter yokuşta kapanın yerine çekilince ayakları zeminin içinde kalıyordu ve zeminden aşağı "düşüyordu". Önceki sürümlerde çukura düşme sanılan düşüşlerin bir kısmı buydu. Artık karakter zeminin üstüne konuyor; ayrıca zeminin içine giren her şey yukarı çıkarılıyor. Botların düşme sayısı her pistte 0 oldu.
 
-## v0.9.0'da olanlar (kullanıcının v0.8 notları, yerelde hazır)
+## v0.9.0'da olanlar (kullanıcının v0.8 notları)
 
 - **Duvara yapışma ve zıplayarak tırmanma:**
   - Havadayken dik bir duvara (taş blok, basamak, yüksek kenar) değen karakter duvara yapışır.
