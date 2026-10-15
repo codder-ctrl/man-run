@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.10.0** (yükleme ekranı, menü arka planı, biçerek geçen testere). v0.10 için puan bekleniyor; kullanıcı telefonda deneyecek. Sonraki büyük iş: karakterleri Blender'da yapmak (kullanıcı 'sonra' dedi).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.10.0** (yükleme ekranı, menü arka planı, biçerek geçen testere). Yerelde hazır: **v0.11.0** (çift zıplama, devrildikten sonra 2 saniye koruma; 'yükle' bekleniyor). Sonraki büyük iş: karakterleri Blender'da yapmak (kullanıcı 'sonra' dedi).
 
 ## Proje
 
@@ -76,6 +76,15 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.10.0** (yükleme ekranı, men�
 - **Oynanış:** Tek eksik: fırlatılan testere bir rakibe çarpınca bitiyordu. Belli bir süre sonra yok olmalı ama rakibe çarpınca biçmeye devam etmeli. (Kullanıcı "tuzak" yazdı ama "biçmeye devam" dediği için testere olarak anlaşıldı ve kullanıcıya böyle söylendi.) v0.10.0'da yapıldı.
 - **Ayrıca istedi:** Ana girişi daha kaliteli bir görsele çevirmek: oyunun yükleme ekranı olsun, sonra karakter seçim ekranına geçilsin. v0.10.0'da yapıldı.
 - **Sonraki büyük iş (kullanıcı söyledi):** Karakterleri Blender'da yapmak (3D modelden hazırlanmış kareler gibi daha akıcı animasyon). Kullanıcı "şimdi geçmeyelim, sonra geçeceğiz" dedi.
+
+**v0.10.0, kullanıcının puanları** (2026-10-15):
+
+| Akıcılık | Grafik | Efektler | Ses | Oynanış |
+|---|---|---|---|---|
+| 7 | 6 | 7 | 6 | 7,5 |
+
+- Akıcılık, grafik, efektler, ses notları v0.9'dakiyle aynı (karakter hareketleri daha akıcı olmalı, Blender sonra).
+- **Oynanış (odak burada):** Çift zıplama gelmeli. Karakterler "öldüğünde" (devrildiğinde) 2 saniye hiçbir tuzaktan etkilenmemeli; bu sırada şeffaf yanıp sönmeli, üstüne bir animasyon eklenebilir (seçim Claude'a bırakıldı → altın hale). Kullanıcı "vulnerable" yazdı ama "etkilenmemeli" dediği için dokunulmazlık kastediliyor. v0.11.0'da yapıldı.
 
 **Sıra (kullanıcı, 2026-10-13):** Önce arkadaşlarla oynanabilir hale getirmek, sonra oyunu geliştirmek (eğilme, mavi pati, akıcılık).
 
@@ -252,6 +261,12 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.10.0** (yükleme ekranı, men�
   - Yükleme bitince "Başlamak için dokun" yazısı nabız gibi atıyor. Dokununca ses açılıyor, telefonda tam ekrana geçiyor ve karakter seçim ekranı açılıyor.
 - **Menü (karakter seçimi):** Arka planı aynı sahnenin logosuz, karaktersiz hali oldu (`img/menu-bg.webp`). Menü açılırken hafifçe yukarı kayarak beliriyor.
 - **Araç:** `npm run splash` → `tools/splash.html` açılınca iki görseli yeniden çizip yazar. Görseli değiştirmek için `tools/splash.js` düzenlenir.
+
+## v0.11.0'da olanlar (oynanış, kullanıcının v0.10 notları, yerelde hazır)
+
+- **Çift zıplama:** Havadayken zıplamaya bir kez daha basınca ikinci bir zıplama (ilkinden biraz alçak, toplamda yaklaşık 1,75 kat yükseklik) ve öne doğru bir takla. Altında beyaz bir halka ve toz çıkar, ayrı bir "vın" sesi var. Yere inince, duvara tutununca ya da mavi pati kullanınca hak yenilenir. Botlar da duvara ya da dikene çarpacakları zaman kullanıyor. Arkadaşla oynarken herkes birbirinin taklasını görüyor.
+- **Devrildikten sonra koruma:** Testere, kapan, şimşek, örs ya da diken seni devirince yerde kaldığın sürece ve kalktıktan sonra 2 saniye hiçbir şey sana işlemez (düşüp yeniden doğunca da 2 saniye). Bu sırada karakter şeffaf yanıp söner (son anlarda daha hızlı), başında altın bir hale döner, etrafında iki küçük yıldız döner. Korumalıyken gelen saldırı altın bir halkayla seker. Kapanların üstünden geçersin, kapan seni yakalamaz. Şimşek korumalı olanlara çarpmaz.
+- **Yardım ekranı ve README** güncellendi.
 
 ## Öğrenilenler
 

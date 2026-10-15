@@ -105,6 +105,14 @@ function basePose(r, t) {
     return p;
   }
 
+  if (r.flip > 0 && !r.grounded) {
+    // Double jump: tucked into a ball for the somersault (render.js turns the whole body).
+    p.legF = -1.5; p.kneeF = 2.2; p.legB = -1.2; p.kneeB = 2.1;
+    p.armF = -0.9; p.armB = -0.5; p.elbF = 1.6; p.elbB = 1.5;
+    p.mouth = 1; p.sq = 0.95; p.tail = -0.4; p.look = 0.6;
+    return p;
+  }
+
   if (!r.grounded) {
     if (r.vy < 0) {
       // Rising: knees tucked, arms up and back.

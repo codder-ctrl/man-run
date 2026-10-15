@@ -109,14 +109,15 @@ export function startBurst(r, angle, speed) {
   r.slideT = 0;
   r.dive = false;
   r.airJump = false;
+  r.dj = false; // a burst gives the double jump back
   r.duck = false;
   r.h = PHYS.h;
 }
 
 // One physics step of a runner's own movement: speed, jumping, sliding, wall climbing, gravity,
 // collisions. input: { jump (pressed this step), hold (jump held), duck (EĞİL pressed this step) }.
-// Returns the moveBody result plus `jumped`, `climbing`, `startClimb` and `topped` (just got over
-// the top of a wall).
+// Returns the moveBody result plus `jumped`, `doubled` (double jump), `climbing`, `startClimb` and
+// `topped` (just got over the top of a wall).
 export function stepRunner(r, dt, T, input, topSpeed) {
   if (input.jump) r.jumpBuf = PHYS.buffer;
   else r.jumpBuf = Math.max(0, r.jumpBuf - dt);
@@ -141,6 +142,8 @@ export function stepRunner(r, dt, T, input, topSpeed) {
       r.duck = false;
       r.h = PHYS.h;
       r.airJump = false;
+      r.dj = false; // the wall gives the double jump back
+      r.flip = 0;
       const res = moveBody(r, dt, T);
       res.climbing = true;
       res.jumped = jumped;
@@ -192,6 +195,7 @@ export function stepRunner(r, dt, T, input, topSpeed) {
   let duck = (r.slideT > 0 && free) || (r.dive && free) || (r.duck && !headroom);
 
   let jumped = false;
+  let doubled = false;
   if (r.jumpBuf > 0 && r.coyote > 0 && free && headroom) {
     r.vy = -PHYS.jumpV;
     r.grounded = false;
@@ -203,6 +207,19 @@ export function stepRunner(r, dt, T, input, topSpeed) {
     r.slideT = 0;
     r.dive = false;
     jumped = true;
+    duck = false;
+  } else if (r.jumpBuf > 0 && !r.grounded && !r.dj && free) {
+    // Double jump (the user asked for it): once per airtime, a second, slightly lower jump with a
+    // forward somersault. Landing, a wall or a paw burst gives it back. Holding works as usual.
+    r.vy = -PHYS.doubleJumpV;
+    r.dj = true;
+    r.jumpBuf = 0;
+    r.cut = false;
+    r.jumpT = 0;
+    r.airJump = true;
+    r.dive = false;
+    r.flip = PHYS.flipTime;
+    doubled = true;
     duck = false;
   }
   r.duck = duck;
@@ -227,8 +244,9 @@ export function stepRunner(r, dt, T, input, topSpeed) {
   r.vy = Math.min(PHYS.maxFall, r.vy + PHYS.gravity * dt);
   const res = moveBody(r, dt, T);
   r.ground = res.ground;
-  if (r.grounded) r.airJump = false;
+  if (r.grounded) { r.airJump = false; r.dj = false; r.flip = 0; }
   res.jumped = jumped;
+  res.doubled = doubled;
 
   // Ran into an upright wall in the air: stick to it (a rising jump keeps rising).
   if (res.blocked && res.wall && free && !duck && !r.grounded) {
@@ -242,7 +260,7 @@ export function stepRunner(r, dt, T, input, topSpeed) {
 }
 
 function cloneBody(r) {
-  return { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut, duck: r.duck, slideT: r.slideT || 0, dive: r.dive, airJump: r.airJump, climb: null, burst: r.burst ? { ...r.burst } : null, canJump: true };
+  return { x: r.x, y: r.y, vx: Math.max(r.vx, 120), vy: r.vy, w: r.w, h: r.h, grounded: r.grounded, ground: r.ground, coyote: r.coyote, jumpBuf: 0, cut: r.cut, duck: r.duck, slideT: r.slideT || 0, dive: r.dive, airJump: r.airJump, dj: r.dj, climb: null, burst: r.burst ? { ...r.burst } : null, canJump: true };
 }
 
 // The path an aimed blue paw would take from where the runner is now (the aiming player's
@@ -283,7 +301,7 @@ export function simulate(r, T, topSpeed, jumpNow, horizon, dt = 1 / 60, duck = f
   let airborne = false;
   for (let t = 0; t < horizon; t += dt) {
     const res = stepRunner(b, dt, T, { jump: jumpNow && t === 0, hold: true, duck: duck && t === 0 }, topSpeed);
-    if (res.jumped) airborne = true;
+    if (res.jumped || res.doubled) airborne = true;
     if (res.blocked || res.climbing) return { danger: 'wall', t, x: b.x };
     if (onSpikes(b, T)) return { danger: 'spikes', t, x: b.x };
     if (!b.grounded && floorBelow(T, b.x, b.y) === Infinity) {

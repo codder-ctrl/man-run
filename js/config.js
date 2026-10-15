@@ -1,7 +1,7 @@
 // Game constants: physics, animals, items. World units: y grows downward, a runner is about
 // 60 units tall, the view is VIEW_H units tall whatever the screen size.
 
-export const VERSION = '0.10.0';
+export const VERSION = '0.11.0';
 
 export const VIEW_H = 450; // a little wider than before: runners are faster now
 export const STEP = 1 / 120; // fixed physics step (seconds)
@@ -9,6 +9,8 @@ export const STEP = 1 / 120; // fixed physics step (seconds)
 export const PHYS = {
   gravity: 2000,
   jumpV: 720, // takeoff speed; apex ≈ jumpV² / 2g ≈ 130 units
+  doubleJumpV: 640, // the second jump in the air (the user asked for a double jump): ≈ 100 more
+  flipTime: 0.38, // the forward somersault that goes with it
   jumpCut: 0.6, // releasing early multiplies the rising speed by this...
   minHold: 0.12, // ...but not before this long, so a quick tap still clears a wall
   maxFall: 1100,
@@ -64,6 +66,9 @@ export const SHIELD_TIME = 6;
 export const SPEED_TIME = 3;
 export const PAD_TIME = 1.4;
 export const BOX_RESPAWN = 4;
+// Knocked down or fallen (the user's rule): nothing can hit you while you're down, nor for this
+// long once you're back on your feet. The runner blinks and wears a golden halo meanwhile.
+export const SAFE_TIME = 2;
 export const SAW_SPEED = 840;
 export const SAW_R = 30; // saw radius (2.5× the first saws, the user asked for big ones)
 export const TRAP_SCALE = 1.5; // traps are 1.5× the first ones

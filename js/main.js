@@ -393,6 +393,9 @@ function handleEvent(e) {
     case 'tick': countdown(String(e.n)); sfx('tick'); break;
     case 'go': countdown('KOŞ!', true); sfx('go'); break;
     case 'jump': if (me) sfx('jump'); break;
+    case 'doubleJump': if (me) sfx('doubleJump'); break;
+    case 'immune': if (me || near) sfx('immune'); break;
+    case 'safe': if (me) sfx('safe'); break;
     case 'land': if (me) sfx('land'); break;
     case 'box': if (me) sfx('box'); break;
     case 'climb': if (me) sfx('climb'); break;

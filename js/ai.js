@@ -94,11 +94,21 @@ export function createBot(r, skill, R) {
       if (race.phase === 'race' && r.vy >= -100 && R() < skill.react * 0.7) { pressJump = true; holdT = 0.3; }
       return;
     }
-    if (!r.grounded && r.coyote <= 0) return;
     if (race.phase !== 'race') return;
     const T = race.T;
     let top = (r.boost > 0 || r.pad > 0 ? PHYS.boost : r.inMud && r.dash <= 0 ? PHYS.mud : PHYS.run) * bot.speedMul;
     if (r.dash > 0) top = Math.max(top, ABILITIES[r.animal].speed);
+    if (!r.grounded && r.coyote <= 0) {
+      // In the air with the double jump left: use it when this arc ends in a wall or on spikes.
+      if (!r.dj && r.vy > -250 && !r.duck) {
+        const fall = simulate(r, T, top, false, 0.5);
+        if ((fall.danger === 'wall' || fall.danger === 'spikes') && !simulate(r, T, top, true, 1.2).danger && R() < skill.react) {
+          pressJump = true;
+          holdT = 0.3;
+        }
+      }
+      return;
+    }
     const ahead = simulate(r, T, top, false, 0.4);
     if (!ahead.danger) { seenDanger = null; return; }
     // New obstacle: sometimes the bot freezes for a moment (that is how they fall in pits).

@@ -9,7 +9,7 @@
 //             (other runners, bots, saws, boxes, places) is copied from the host's snapshots.
 // Runner control (r.ctrl): 'local' (this phone's input), 'bot', 'remote'.
 
-import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, SAW_R, TRAP_SCALE, TRAP_THROW, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE } from './config.js';
+import { PHYS, ITEMS, ITEM_IDS, STUN, SHIELD_TIME, SPEED_TIME, PAD_TIME, BOX_RESPAWN, SAW_SPEED, SAW_LIFE, SAW_R, TRAP_SCALE, TRAP_THROW, ANIMALS, BOT_SKILL, ABILITIES, PAW_CHARGE, SAFE_TIME } from './config.js';
 import { buildTrack, respawnAt, rng, floorBelow } from './track.js';
 import { stepRunner, moveBody, onSpikes, inStrip, startBurst } from './physics.js';
 import { createBot } from './ai.js';
@@ -102,7 +102,8 @@ export function applyHit(r, kind) {
   r.pad = 0;
   r.dash = 0;
   r.burst = null;
-  if (kind === 'spikes') { r.vy = -520; r.vx = -140; r.grounded = false; r.invuln = 1.4; }
+  r.flip = 0;
+  if (kind === 'spikes') { r.vy = -520; r.vx = -140; r.grounded = false; }
   else if (kind === 'saw' || kind === 'anvil') { r.vx = 0; if (r.grounded) r.vy = -260; r.grounded = false; }
   else r.vx *= 0.2;
 }
@@ -110,8 +111,12 @@ export function applyHit(r, kind) {
 // Hits a runner with an attack; shields block. Returns true if it landed.
 export function hit(race, r, kind, from, extra = {}) {
   if (r.dead > 0 || r.finished) return false;
+  // Down, or back up for less than SAFE_TIME (the user's rule): nothing lands.
+  if (r.stun > 0 || r.invuln > 0) {
+    if (r.invuln > 0 && kind !== 'spikes') emit(race, 'immune', { id: r.id, kind });
+    return false;
+  }
   if (r.shield > 0) { emit(race, 'blocked', { id: r.id, kind }); return false; }
-  if (kind === 'spikes' && r.invuln > 0) return false;
   applyHit(r, kind);
   emit(race, 'hit', { id: r.id, kind, from: from?.id, ...extra });
   return true;
@@ -162,10 +167,11 @@ export function useItem(race, r, angle = null) {
   r.item = null;
   emit(race, 'use', { id: r.id, item });
   if (item === 'shield') r.shield = SHIELD_TIME;
-  else if (item === 'speed') { r.boost = SPEED_TIME; r.stun = 0; }
+  else if (item === 'speed') { if (r.stun > 0) r.invuln = Math.max(r.invuln, SAFE_TIME); r.boost = SPEED_TIME; r.stun = 0; }
   else if (item === 'lightning') {
-    for (const o of race.runners) if (o !== r) hit(race, o, 'lightning', r);
-    emit(race, 'lightning', { id: r.id });
+    const zapped = [];
+    for (const o of race.runners) if (o !== r && hit(race, o, 'lightning', r)) zapped.push(o.id);
+    emit(race, 'lightning', { id: r.id, zapped });
   } else if (item === 'saw') {
     race.saws.push(makeSaw(race, r, angle));
   } else if (item === 'trap') {
@@ -201,9 +207,15 @@ function tickTimers(race, r, dt) {
     r.rolling -= dt;
     if (r.rolling <= 0) { r.rolling = 0; if (race.role !== 'guest') emit(race, 'itemReady', { id: r.id, item: r.item }); }
   }
+  r.flip = Math.max(0, (r.flip || 0) - dt);
   const wasStunned = r.stun > 0;
   r.stun = Math.max(0, r.stun - dt);
-  if (wasStunned && r.stun === 0) r.stunKind = null;
+  if (wasStunned && r.stun === 0) {
+    // Back on your feet: SAFE_TIME of protection (the halo and blinking show it).
+    r.stunKind = null;
+    r.invuln = Math.max(r.invuln, SAFE_TIME);
+    if (r.ctrl !== 'remote') emit(race, 'safe', { id: r.id });
+  }
 }
 
 // "?" boxes are per runner: taking one hides it only for you (b.taken[runnerId] = respawn time
@@ -246,7 +258,7 @@ function updateRunner(race, r, dt, input) {
       const p = respawnAt(T, r.deathX);
       r.dead = 0;
       r.x = p.x; r.y = p.y; r.vx = 0; r.vy = 0; r.grounded = true;
-      r.stun = 0; r.invuln = 1.5;
+      r.stun = 0; r.invuln = SAFE_TIME;
       emit(race, 'respawn', { id: r.id });
     }
     return;
@@ -258,6 +270,7 @@ function updateRunner(race, r, dt, input) {
   const wasGrounded = r.grounded;
   const res = stepRunner(r, dt, T, r.canJump ? input : { jump: false, hold: false }, topSpeed(race, r));
   if (res.jumped) emit(race, 'jump', { id: r.id });
+  if (res.doubled) emit(race, 'doubleJump', { id: r.id });
   if (res.startClimb) emit(race, 'climb', { id: r.id });
   if (res.topped) emit(race, 'topped', { id: r.id });
   if (input.duck && r.duck && r.grounded) emit(race, 'slide', { id: r.id });
@@ -301,6 +314,7 @@ function updateRemote(race, r, dt) {
       r.duck = n.duck; r.h = n.duck ? PHYS.duckH : PHYS.h; r.dash = n.dash; r.climb = n.climb ? { top: r.y } : null;
       r.aim = n.aim ?? null;
       r.aimKind = r.aim === null ? null : n.aimKind || 'paw';
+      r.netFlip = n.flip || 0;
     }
     if (r.dead <= 0) pickupBoxes(race, r);
     checkFinish(race, r);
@@ -314,6 +328,9 @@ function updateRemote(race, r, dt) {
     if (r.lastSt === 'dead') emit(race, 'respawn', { id: r.id, remote: true });
   }
   r.lastSt = st;
+  // A double jump shows up as a new somersault in the reports/snapshots; play it out locally.
+  if (r.netFlip > 0.05 && !(r.lastNetFlip > 0)) { r.flip = r.netFlip; emit(race, 'doubleJump', { id: r.id, remote: true }); }
+  r.lastNetFlip = r.netFlip || 0;
   r.climbPhase = r.climb ? ((r.climbPhase || 0) + dt * 4) % 1 : 0;
   if (r.dash > 0 && !(r.lastDash > 0)) emit(race, 'paw', { id: r.id, remote: true });
   r.lastDash = r.dash;
@@ -393,6 +410,7 @@ function updateTraps(race, dt) {
     for (const r of race.runners) {
       if (r.dead > 0 || r.finished) continue;
       if (r.id === t.owner || t.caught[r.id] !== undefined) continue; // never its owner, once each
+      if (r.stun > 0 || r.invuln > 0) continue; // down or just back up: walks right over it
       if (Math.abs(r.x - t.x) < 22 * TRAP_SCALE && Math.abs(r.y - t.y) < 14 * TRAP_SCALE) {
         t.caught[r.id] = race.time;
         if (hit(race, r, 'trap', race.runners[t.owner], { x: t.x })) {

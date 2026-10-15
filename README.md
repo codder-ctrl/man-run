@@ -14,11 +14,13 @@ Your animal runs by itself. You only decide when to jump, slide and use your ite
 
 | Action | Phone | Keyboard |
 |---|---|---|
-| Jump (hold for higher) | left side of the screen or **ZIPLA** | `Space` / `↑` / `W` |
+| Jump (hold for higher, again in the air to double jump) | left side of the screen or **ZIPLA** | `Space` / `↑` / `W` |
 | Slide (one tap) | **EĞİL** | `↓` / `S` |
 | Blue paw: aim and dash | hold **🐾**, drag to aim, let go (a tap dashes forward) | hold `Q`, aim with `↑`/`↓`, let go |
 | Use item | hold the item button, let go (drag to aim a saw or a trap) | hold `E`, aim with `↑`/`↓`, let go |
 
+- **Double jump:** press jump again in the air for a second, slightly lower jump with a somersault. You get it back when you land, grab a wall or use the blue paw.
+- **Back on your feet, safe for 2 seconds:** once something knocks you down (saw, trap, lightning, anvil, spikes), nothing can hit you while you're down, nor for 2 seconds after you get up. You blink see-through and wear a golden halo meanwhile.
 - **Jumping and sliding cost speed:** in the air after a jump and while sliding, your top speed drops to 80%. Don't jump for nothing.
 - **Slide:** one tap slides for a moment, then you stand up by yourself; under a low rock roof you stay down until you're out. Tapped in the air, it dives straight down and slides on landing.
 - **Climb:** touch any upright wall in the air and you stick to it. Each jump kicks you a jump's height up the wall and you grab on again; stop jumping and you slowly slide down. Keep jumping and you get over the top. Low rock roofs can't be climbed, only slid under.

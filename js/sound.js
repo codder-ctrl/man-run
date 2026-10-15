@@ -122,6 +122,9 @@ function bell(f, t = 0, vol = 0.1, dur = 0.5, bus = sfxBus) {
 const jitter = (f, k = 0.04) => f * (1 + (Math.random() - 0.5) * k);
 
 const SFX = {
+  doubleJump() { tone({ f: jitter(500), f2: jitter(940), dur: 0.16, vol: 0.11 }); noise({ dur: 0.16, vol: 0.05, freq: 2600, f2: 4400, q: 0.8 }); },
+  immune() { bell(1760, 0, 0.05, 0.25); bell(2350, 0.05, 0.04, 0.3); },
+  safe() { [988, 1319, 1760].forEach((f, i) => bell(f, i * 0.05, 0.05, 0.35)); },
   jump() { tone({ f: jitter(330), f2: jitter(560), dur: 0.14, vol: 0.12 }); noise({ dur: 0.08, vol: 0.04, freq: 1800, q: 0.7 }); },
   land() { tone({ f: 120, f2: 60, dur: 0.1, vol: 0.14 }); noise({ dur: 0.08, vol: 0.06, freq: 400, type: 'lowpass' }); },
   box() { [784, 988, 1175].forEach((f, i) => bell(f, i * 0.05, 0.07, 0.4)); noise({ dur: 0.1, vol: 0.05, freq: 3000, q: 0.8 }); },

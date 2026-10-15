@@ -1,14 +1,14 @@
 // Draws the race: camera, layered world, runners, items and effects. Turns race events into
 // effects (dust, shards, bolts, shake, hit-stop).
 
-import { VIEW_H, ABILITIES, AIMED_ITEMS, ITEMS, SAW_R, TRAP_SCALE } from './config.js';
+import { VIEW_H, PHYS, ABILITIES, AIMED_ITEMS, ITEMS, SAW_R, TRAP_SCALE } from './config.js';
 import { predictItemPath } from './game.js';
 import { floorBelow } from './track.js';
 import { predictBurst } from './physics.js';
 import { drawAnimal, poseFor, drawTrap, ANIMAL } from './animals.js';
 import { createBackdrop, createTerrain, createForeground, createWeather, drawMud, drawPad, drawBox, drawDeco, drawFinish, LIVE_DECO, THEMES } from './scenery.js';
 import { createFx, drawSaw, drawAnvil, drawItemIcon } from './fx.js';
-import { blob, line, flat, glow, shadow, circle, ellipse, roundRect, poly, INK, rgba, tint } from './paint.js';
+import { blob, line, flat, glow, shadow, circle, ellipse, roundRect, poly, star, INK, rgba, tint } from './paint.js';
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
@@ -95,6 +95,9 @@ export function createRenderer(canvas) {
     const dust = theme.dust;
     switch (e.type) {
       case 'jump': fx.dust(r.x, r.y, 4, -1, dust); break;
+      case 'doubleJump': fx.ring(r.x, r.y + 2, 30, '#ffffff', 0.35); fx.dust(r.x, r.y + 4, 5, 0, dust); fx.twinkles(r.x, r.y, 4, '#fff6c8'); break;
+      case 'immune': fx.ring(r.x, r.y - 30, 40, '#ffe27a', 0.35); fx.twinkles(r.x, r.y - 40, 6, '#ffe9a0'); break;
+      case 'safe': fx.twinkles(r.x, r.y - 60, 8, '#ffe9a0'); break;
       case 'land': fx.landing(r.x, r.y, dust, e.hard); if (me && e.hard) cam.shake = Math.max(cam.shake, 3); break;
       case 'box': if (me) fx.shards(e.x, e.y); break;
       case 'climb': fx.dust(r.x + 12, r.y - 10, 3, -1, dust); break;
@@ -111,7 +114,7 @@ export function createRenderer(canvas) {
       case 'blocked': fx.ring(r.x, r.y - 26, 46, '#bff0ff', 0.4); fx.sparks(r.x, r.y - 26, '#bff0ff', 10); break;
       case 'lightning': {
         const top = cam.y - 60;
-        for (const o of race.runners) if (o !== r && o.dead <= 0 && !o.finished) fx.bolt(o.x, o.y, top);
+        for (const o of race.runners) if (o !== r && o.dead <= 0 && !o.finished && (!e.zapped || e.zapped.includes(o.id))) fx.bolt(o.x, o.y, top);
         cam.flash = 0.6;
         cam.flashColor = '#fff7c0';
         cam.shake = Math.max(cam.shake, 8);
@@ -336,7 +339,9 @@ export function createRenderer(canvas) {
       ctx.globalAlpha = 1;
     }
 
-    if (r.invuln > 0 && r.stun <= 0 && Math.floor(t * 14) % 2 === 0) ctx.globalAlpha = 0.45;
+    // Back up after a knock-down (SAFE_TIME): see-through blinking, quicker as it runs out.
+    const safe = r.invuln > 0 && r.stun <= 0 && r.dead <= 0;
+    if (safe && Math.floor(t * (r.invuln < 0.6 ? 22 : 12)) % 2 === 0) ctx.globalAlpha = 0.35;
     const fy = floorBelow(race.T, r.x, r.y - 2);
     if (fy < Infinity && fy - r.y < 240) shadow(ctx, r.x, fy, 19 * (1 - (fy - r.y) / 320), 0.32);
     if (r.boost > 0 || r.pad > 0 || r.dash > 0) {
@@ -412,11 +417,20 @@ export function createRenderer(canvas) {
     if (r.inMud && r.vx > 60 && Math.random() < dt * 18) fx.dust(r.x, r.y, 1, -1, '#7a5236');
 
     ctx.save();
-    ctx.translate(r.x, r.y);
-    ctx.rotate(r.drawRot);
+    if (r.flip > 0) {
+      // Double jump: a forward somersault around the middle of the body.
+      const k = 1 - r.flip / PHYS.flipTime;
+      ctx.translate(r.x, r.y - 26);
+      ctx.rotate(r.drawRot + (k * k * (3 - 2 * k)) * Math.PI * 2);
+      ctx.translate(0, 26);
+    } else {
+      ctx.translate(r.x, r.y);
+      ctx.rotate(r.drawRot);
+    }
     drawAnimal(ctx, r.animal, poseFor(r, t), t);
     ctx.restore();
     ctx.globalAlpha = 1;
+    if (safe) drawHalo(r, t);
 
     if (r.shield > 0) {
       const fade = r.shield < 1.2 && Math.floor(t * 10) % 2 === 0 ? 0.35 : 1;
@@ -434,7 +448,7 @@ export function createRenderer(canvas) {
     }
     // Name tag.
     const label = isPlayer ? 'SEN' : r.name || a.name;
-    const ly = r.y - 84 - (r.tagLift || 0);
+    const ly = r.y - 84 - (r.tagLift || 0) - (safe ? 12 : 0); // room for the halo
     ctx.font = `${isPlayer ? 14 : 12}px "Lilita One", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -444,6 +458,40 @@ export function createRenderer(canvas) {
     if (isPlayer) flat(ctx, poly([[r.x - 5, ly + 8], [r.x + 5, ly + 8], [r.x, ly + 14]]), '#ffd23f');
     ctx.fillStyle = isPlayer ? '#4a2a10' : '#ffffff';
     ctx.fillText(label, r.x, ly + 0.5);
+  }
+
+  // SAFE_TIME after a knock-down: a golden halo bobbing over the head, a soft glow and two little
+  // stars circling the body, fading out at the end.
+  function drawHalo(r, t) {
+    const fade = Math.min(1, r.invuln / 0.3);
+    const hx = r.x + 3;
+    const hy = (r.duck ? r.y - 36 : r.y - 70) + Math.sin(t * 4 + r.id) * 2;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.globalCompositeOperation = 'lighter';
+    glow(ctx, r.x, r.y - 30, 46, '#ffe27a', 0.22 + Math.sin(t * 6) * 0.06);
+    glow(ctx, hx, hy, 22, '#fff2b0', 0.5);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineWidth = 5.5;
+    ctx.strokeStyle = 'rgba(42,27,23,0.75)';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, 14.5, 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 3.2;
+    ctx.strokeStyle = '#ffd23f';
+    ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#fff8d6';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy - 0.8, 13.4, 4, 0, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+    for (let i = 0; i < 2; i++) {
+      const a = t * 4 + i * Math.PI;
+      const sx = r.x + Math.cos(a) * 24;
+      const sy = r.y - 30 + Math.sin(a) * 9;
+      flat(ctx, star(sx, sy, 4.5, 1.6, 4), '#fff2b0', 0.95);
+    }
+    ctx.restore();
   }
 
   // The private aim guide (only on the aiming phone): a faint ring, the predicted path as dots and a

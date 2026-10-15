@@ -1,9 +1,9 @@
 // The aimed blue paw, sliding and climbing on a real generated track (the flat start area).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRace, stepRace, usePaw, useItem, predictItemPath } from '../js/game.js';
+import { createRace, stepRace, usePaw, useItem, predictItemPath, hit } from '../js/game.js';
 import { predictBurst, roofAbove } from '../js/physics.js';
-import { STEP } from '../js/config.js';
+import { STEP, PHYS, SAFE_TIME, STUN } from '../js/config.js';
 
 const UP = Math.PI / 2;
 
@@ -178,13 +178,12 @@ test('a saw mows through every runner it touches and wears out by itself', () =>
   owner.item = 'saw';
   useItem(race, owner, 0);
   const saw = race.saws[0];
-  // Two runners standing (dazed) in its way.
-  for (const [r, dx] of [[a, 120], [b, 260]]) {
-    Object.assign(r, { x: saw.x + dx, y: owner.y, vx: 0, vy: 0, shield: 0, stun: 5, invuln: 0, grounded: true });
-  }
+  // Two runners held in its way until it reaches them (a dazed runner would be protected).
+  const spots = [[a, saw.x + 120], [b, saw.x + 260]];
   const hits = new Set();
   let lived = 0;
   for (let t = 0; t < 6 && race.saws.length; t += STEP) {
+    for (const [r, x] of spots) if (!hits.has(r.id)) Object.assign(r, { x, y: owner.y, vx: 0, vy: 0, shield: 0, stun: 0, invuln: 0, grounded: true });
     stepRace(race, STEP);
     for (const e of race.events) if (e.type === 'hit' && e.kind === 'saw') hits.add(e.id);
     race.events.length = 0;
@@ -214,4 +213,57 @@ test('a trap catches every runner once, not just the first', () => {
   assert.ok(trap.caught[a.id] !== undefined && trap.caught[b.id] !== undefined, 'both runners were caught');
   assert.equal(race.traps.length, 1, 'the trap is still there for the others');
   assert.equal(trap.caught[owner.id], undefined, 'never its owner');
+});
+
+test('a second jump in the air goes higher, once per airtime', () => {
+  const one = freshRace();
+  one.player.y0 = one.player.y;
+  stepRace(one, STEP, { jump: true, hold: true });
+  const single = track(one, 1.2, { hold: true });
+
+  const two = freshRace();
+  const p = two.player;
+  p.y0 = p.y;
+  stepRace(two, STEP, { jump: true, hold: true });
+  for (let t = 0; t < 0.3; t += STEP) stepRace(two, STEP, { hold: true });
+  stepRace(two, STEP, { jump: true, hold: true });
+  assert.ok(p.dj && p.flip > 0, 'double jump used, somersault started');
+  const vy = p.vy;
+  stepRace(two, STEP, { jump: true, hold: true });
+  assert.ok(p.vy >= vy, 'a third press does nothing');
+  const double = track(two, 1.5, { hold: true });
+  console.log(`single jump rises ${single.rise.toFixed(0)}, double jump ${double.rise.toFixed(0)}`);
+  assert.ok(double.rise > single.rise + 60, 'the double jump climbs well above a single one');
+  assert.ok(p.grounded && !p.dj && p.flip === 0, 'landing gives it back');
+});
+
+test('knocked down: nothing lands until SAFE_TIME after getting back up', () => {
+  const race = createRace({ seed: 7, theme: 'forest', allBots: true });
+  while (race.phase !== 'race') stepRace(race, STEP);
+  const [a, b] = race.runners;
+  b.shield = 0;
+  assert.ok(hit(race, b, 'saw', a), 'the first hit lands');
+  assert.equal(hit(race, b, 'lightning', a), false, 'not while down');
+  for (let t = 0; t < STUN.saw + 0.05; t += STEP) stepRace(race, STEP);
+  assert.equal(b.stun, 0, 'back up');
+  assert.ok(b.invuln > SAFE_TIME - 0.2, `protected for ${b.invuln.toFixed(2)} s`);
+  assert.equal(hit(race, b, 'anvil', a), false, 'still protected');
+  for (let t = 0; t < SAFE_TIME + 0.05; t += STEP) stepRace(race, STEP);
+  b.shield = 0;
+  assert.ok(hit(race, b, 'lightning', a), 'hit again once it runs out');
+});
+
+test('a protected runner walks over a trap without springing it for themselves', () => {
+  const race = createRace({ seed: 7, theme: 'forest', allBots: true });
+  while (race.phase !== 'race') stepRace(race, STEP);
+  const [owner, a] = race.runners;
+  a.invuln = 3; // protected from the start, so it can't have been caught while the trap settles
+  owner.item = 'trap';
+  useItem(race, owner, null);
+  const trap = race.traps[0];
+  for (let t = 0; t < 0.3; t += STEP) stepRace(race, STEP);
+  Object.assign(a, { x: trap.x, y: trap.y, vy: 0, grounded: true, shield: 0, stun: 0 });
+  stepRace(race, STEP);
+  assert.equal(trap.caught[a.id], undefined, 'not caught while protected');
+  assert.equal(a.stunKind, null);
 });
