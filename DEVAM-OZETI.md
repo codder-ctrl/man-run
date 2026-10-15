@@ -1,6 +1,6 @@
 # Man Run — Devam Özeti (yeni oturum için)
 
-Son güncelleme: 2026-10-14. Canlı sürüm: **v0.10.0** (yükleme ekranı, menü arka planı, biçerek geçen testere). Yerelde hazır: **v0.11.0** (çift zıplama, devrildikten sonra 2 saniye koruma; 'yükle' bekleniyor). Sonraki büyük iş: karakterleri Blender'da yapmak (kullanıcı 'sonra' dedi).
+Son güncelleme: 2026-10-14. Canlı sürüm: **v0.11.0** (çift zıplama, devrildikten sonra 2 saniye koruma). v0.11 için puan bekleniyor; kullanıcı telefonda deneyecek (çift zıplamanın yüksekliği fazla gelirse alçaltılacak). Sonraki büyük iş: karakterleri Blender'da yapmak (kullanıcı 'sonra' dedi).
 
 ## Proje
 
@@ -262,7 +262,7 @@ Son güncelleme: 2026-10-14. Canlı sürüm: **v0.10.0** (yükleme ekranı, men�
 - **Menü (karakter seçimi):** Arka planı aynı sahnenin logosuz, karaktersiz hali oldu (`img/menu-bg.webp`). Menü açılırken hafifçe yukarı kayarak beliriyor.
 - **Araç:** `npm run splash` → `tools/splash.html` açılınca iki görseli yeniden çizip yazar. Görseli değiştirmek için `tools/splash.js` düzenlenir.
 
-## v0.11.0'da olanlar (oynanış, kullanıcının v0.10 notları, yerelde hazır)
+## v0.11.0'da olanlar (oynanış, kullanıcının v0.10 notları)
 
 - **Çift zıplama:** Havadayken zıplamaya bir kez daha basınca ikinci bir zıplama (ilkinden biraz alçak, toplamda yaklaşık 1,75 kat yükseklik) ve öne doğru bir takla. Altında beyaz bir halka ve toz çıkar, ayrı bir "vın" sesi var. Yere inince, duvara tutununca ya da mavi pati kullanınca hak yenilenir. Botlar da duvara ya da dikene çarpacakları zaman kullanıyor. Arkadaşla oynarken herkes birbirinin taklasını görüyor.
 - **Devrildikten sonra koruma:** Testere, kapan, şimşek, örs ya da diken seni devirince yerde kaldığın sürece ve kalktıktan sonra 2 saniye hiçbir şey sana işlemez (düşüp yeniden doğunca da 2 saniye). Bu sırada karakter şeffaf yanıp söner (son anlarda daha hızlı), başında altın bir hale döner, etrafında iki küçük yıldız döner. Korumalıyken gelen saldırı altın bir halkayla seker. Kapanların üstünden geçersin, kapan seni yakalamaz. Şimşek korumalı olanlara çarpmaz.
